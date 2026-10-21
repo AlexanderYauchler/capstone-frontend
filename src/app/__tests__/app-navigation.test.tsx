@@ -152,13 +152,13 @@ describe('CoSign Sequence 2 — Role Selection, Layout & Route Navigation', () =
     const loginForAnalyst = renderWithRouter(['/login']);
     await user.click(screen.getByRole('button', { name: /Explore analyst view/i }));
     expect(
-      await screen.findByRole('heading', { name: /Healthcare analytics/i }),
+      await screen.findByRole('heading', { level: 1, name: /Healthcare analytics/i }),
     ).toBeInTheDocument();
     loginForAnalyst.unmount();
 
     const refreshedAnalystRender = renderWithRouter(['/analyst/analytics?view=cohort']);
     expect(
-      await screen.findByRole('heading', { name: /Healthcare analytics/i }),
+      await screen.findByRole('heading', { level: 1, name: /Healthcare analytics/i }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: /Access restricted/i }),
