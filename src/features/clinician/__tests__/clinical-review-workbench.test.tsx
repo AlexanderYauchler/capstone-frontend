@@ -249,13 +249,14 @@ describe('CoSign Sequence 3B — Functional Clinical Review Workbench', () => {
     expect(screen.queryByRole('button', { name: /^Save Draft$/i })).not.toBeInTheDocument();
     finalizedRender.unmount();
 
-    // 2. Processing session (CS-1048) shows informative ungenerated report state
+    // 2. Processing session (CS-1048) shows the simulated processing progress instead of a draft
     const processingRender = renderWorkbench(['/clinician/sessions/CS-1048']);
     expect(
       await screen.findByRole('heading', {
-        name: /Clinical report draft not yet generated/i,
+        name: /Preparing the draft report/i,
       }),
     ).toBeInTheDocument();
+    expect(screen.getByText(/No real transcription or AI service is called/i)).toBeInTheDocument();
     processingRender.unmount();
 
     // 3. Patient role attempting to access /clinician/sessions/CS-1042 is blocked by RoleGuard

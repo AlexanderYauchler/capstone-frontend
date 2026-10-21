@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useBlocker, useParams, useSearchParams } from 'react-router';
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Clock,
   FileAudio,
   FolderKanban,
   HardDriveUpload,
@@ -23,6 +22,7 @@ import {
   Square,
   Trash2,
   Upload,
+  Sparkles,
   Volume2,
   XCircle,
 } from 'lucide-react';
@@ -103,7 +103,7 @@ const STUDIO_STAGE_METADATA: Record<
     label: 'Recording',
     badgeTone: 'info',
     description:
-      'Live microphone audio capture is active. Elapsed time and input levels reflect real browser capture.',
+      'Recording from your microphone. The timer and level meter reflect real audio input.',
   },
   paused: {
     label: 'Paused',
@@ -121,25 +121,24 @@ const STUDIO_STAGE_METADATA: Record<
     label: 'Ready to submit',
     badgeTone: 'info',
     description:
-      'Audio has been captured and verified locally. Preview the audio below, discard to re-record, or submit to the capture service.',
+      'Audio was captured and checked in this browser. Listen to it below, record again, or save it to the visit.',
   },
   uploading: {
-    label: 'Uploading',
+    label: 'Saving',
     badgeTone: 'info',
-    description:
-      'Transferring and validating audio with the configured capture service…',
+    description: 'Saving the recording to this visit…',
   },
   submitted: {
-    label: 'Submitted',
+    label: 'Saved',
     badgeTone: 'success',
     description:
-      'Audio capture is complete and linked to the clinical encounter. Speech transcription and AI report drafting belong to Sequence 4B.',
+      'The recording is linked to this visit. Next, generate the draft report and review it.',
   },
   failed: {
     label: 'Failed',
     badgeTone: 'danger',
     description:
-      'Audio capture or upload encountered an error. Review the diagnostic details below and retry.',
+      'Something went wrong. Read the message below, then try again.',
   },
 };
 
@@ -176,6 +175,8 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
   const { isDemoMode } = useServiceContext();
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [isStartingDraft, setIsStartingDraft] = useState<boolean>(false);
 
   // Active Encounter State
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
@@ -251,9 +252,14 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
 
   const activeSession: ClinicalSession | undefined = existingBundle?.session;
 
-  // Synchronize consent and existing recording state when an existing session loads
-  useEffect(() => {
-    if (!activeSession) return;
+  // Synchronize form fields and recording state when an existing session loads.
+  // Done during render (keyed by session revision) rather than in an effect.
+  const sessionSyncKey = activeSession
+    ? `${activeSession.id}:${activeSession.updatedAt}:${existingBundle?.recording?.id ?? ''}`
+    : null;
+  const [syncedSessionKey, setSyncedSessionKey] = useState<string | null>(null);
+  if (activeSession && sessionSyncKey !== syncedSessionKey) {
+    setSyncedSessionKey(sessionSyncKey);
     setSelectedPatientId(activeSession.patientId);
     setSelectedDepartment(activeSession.department);
     setVisitType(activeSession.visitType);
@@ -272,11 +278,11 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
         prev === 'recording' || prev === 'paused' || prev === 'uploading' ? prev : 'submitted',
       );
       const transientHandle = transientMediaRegistry.getRecordingBySession(activeSession.id);
-      if (transientHandle && !previewObjectUrlRef.current) {
+      if (transientHandle && !capturedBlob) {
         setCapturedBlob(transientHandle.blob);
       }
     }
-  }, [activeSession, existingBundle?.recording]);
+  }
 
   // Helper to release microphone stream, timer, and Web Audio analyser
   const releaseMicrophoneResources = useCallback(() => {
@@ -333,13 +339,12 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
 
   // Enumerate microphone devices and listen for hardware connect/disconnect events
   const refreshMicrophoneDevices = useCallback(async () => {
+    const { devices, enumerationSupported } = await enumerateAudioInputDevices();
     const envCheck = detectBrowserAudioEnvironment();
     setBrowserEnv(envCheck);
     if (envCheck.preferredMimeType) {
       setNegotiatedMimeType(envCheck.preferredMimeType);
     }
-
-    const { devices, enumerationSupported } = await enumerateAudioInputDevices();
     setInputDevices(devices);
 
     if (devices.length > 0) {
@@ -355,7 +360,8 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
   }, []);
 
   useEffect(() => {
-    void refreshMicrophoneDevices();
+    // Device enumeration is asynchronous; state updates land when the browser responds.
+    void Promise.resolve().then(refreshMicrophoneDevices);
 
     if (
       typeof navigator !== 'undefined' &&
@@ -681,17 +687,23 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
             return 'failed';
           }
           const finalMime = recorder.mimeType || mimeToUse || 'audio/webm';
-          const assembledBlob =
-            audioChunksRef.current.length > 0
-              ? new Blob(audioChunksRef.current, { type: finalMime })
-              : new Blob(['cosign-captured-audio-buffer'], { type: finalMime });
+          const assembledBlob = new Blob(audioChunksRef.current, { type: finalMime });
+
+          // Validate the capture: an empty or sub-second recording cannot be used.
+          if (assembledBlob.size === 0 || elapsedSecondsRef.current < 1) {
+            setNewPreviewBlob(null);
+            setHasStoppedRecording(false);
+            setErrorDetails({
+              title: 'The recording was empty',
+              message:
+                'No usable audio was captured. Check that the right microphone is selected and not muted, then record again for at least a few seconds.',
+              code: 'EMPTY_RECORDING',
+            });
+            return 'failed';
+          }
 
           setNewPreviewBlob(assembledBlob);
           setHasStoppedRecording(true);
-          if (elapsedSecondsRef.current <= 0) {
-            elapsedSecondsRef.current = 1;
-            setElapsedSeconds(1);
-          }
           return 'ready_to_submit';
         });
       });
@@ -990,6 +1002,62 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
     });
   };
 
+  // Demo fallback when no microphone is available: attaches labeled simulated audio metadata.
+  const handleUseSimulatedAudio = async () => {
+    if (!isConsentConfirmed && !consentChecked) {
+      setStudioStage('failed');
+      setErrorDetails({
+        title: 'Patient recording consent required',
+        message: 'Confirm patient consent before attaching simulated demo audio.',
+        code: 'CONSENT_REQUIRED',
+      });
+      return;
+    }
+    setErrorDetails(null);
+    setStudioStage('uploading');
+    try {
+      const session = await ensureConsentedSession();
+      const { recording } = await services.capture.createSimulatedRecording({
+        sessionId: session.id,
+        durationSeconds: 312,
+      });
+      setSubmittedRecording(recording);
+      setStudioStage('submitted');
+      await refetchBundle();
+      await invalidateWorkspaceQueries(queryClient);
+    } catch (err) {
+      setStudioStage('failed');
+      setErrorDetails({
+        title: 'Could not attach simulated audio',
+        message: err instanceof Error ? err.message : 'An unexpected error occurred.',
+      });
+    }
+  };
+
+  // Next step after saving audio: start the (simulated) processing pipeline and open the review page.
+  const handleGenerateDraft = async () => {
+    if (!activeSession || !submittedRecording) return;
+    setIsStartingDraft(true);
+    setErrorDetails(null);
+    try {
+      await services.processing.startProcessingPipeline({
+        sessionId: activeSession.id,
+        recordingId: submittedRecording.id,
+        origin: submittedRecording.origin,
+        templateId: activeSession.templateId,
+      });
+      await invalidateWorkspaceQueries(queryClient);
+      void navigate(`/clinician/sessions/${activeSession.id}`);
+    } catch (err) {
+      setErrorDetails({
+        title: 'Could not start draft generation',
+        message: err instanceof Error ? err.message : 'An unexpected error occurred.',
+      });
+    } finally {
+      setIsStartingDraft(false);
+    }
+  };
+
   const handleStartFreshEncounter = () => {
     releaseMicrophoneResources();
     clearLocalPreviewUrl();
@@ -1085,7 +1153,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
             ›
           </span>
           <span className="font-bold text-[#242628]">
-            Clinical Visit Recording &amp; Audio Upload
+            New recording
             {activeSession ? ` (${activeSession.id})` : ''}
           </span>
         </div>
@@ -1111,21 +1179,16 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
             <div className="inline-flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[#c8f59b]">
               <span>{ROLE_WORKSPACE_LABELS[currentUser.role]}</span>
               <span>·</span>
-              <span>Sequence 4A Recording Studio</span>
+              <span>New recording</span>
               <span>·</span>
-              <span>
-                {isDemoMode
-                  ? 'Demo Mode (Real Browser Capture · Memory-Only Storage)'
-                  : 'Connected Mode (Service Adapter)'}
-              </span>
+              <span>{isDemoMode ? 'Audio stays in this browser' : 'Connected service'}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight font-display">
-              Clinical Visit Recording &amp; Audio Upload
+              Record a clinical visit
             </h1>
             <p className="text-xs sm:text-sm text-white/95 leading-relaxed">
-              Confirm synthetic patient recording consent, capture visit audio via your browser
-              microphone or upload a consented audio file, preview locally, and submit to the
-              capture pipeline.
+              1. Choose the patient and visit. 2. Confirm recording consent. 3. Record with your
+              microphone (or attach a file), listen back, and save it to the visit.
             </p>
           </div>
 
@@ -1174,7 +1237,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-xs font-bold uppercase tracking-wider text-[#0d4026]">
-              Studio Capture State:
+              Recording status:
             </span>
             <StatusBadge tone={currentStageMeta.badgeTone}>
               {currentStageMeta.label}
@@ -1193,9 +1256,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
           </div>
 
           <div className="text-xs font-semibold text-[#0d4026]">
-            {isDemoMode
-              ? 'Mode: Demo (Simulated Capture Submission · Memory-Only Blob)'
-              : 'Mode: Connected Service Adapter'}
+            {isDemoMode ? 'Demo mode · Nothing is uploaded to a server' : 'Connected mode'}
           </div>
         </div>
 
@@ -1205,7 +1266,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
 
         {/* 9-State Visual Pill Bar */}
         <ol
-          aria-label="Capture studio states"
+          aria-label="Recording steps"
           className="flex flex-wrap items-center gap-1.5 pt-1"
         >
           {ALL_STUDIO_STAGES_ORDER.map((stageKey) => {
@@ -1328,7 +1389,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                   Step 1 of 3
                 </span>
                 <h2 className="text-lg font-bold text-[#0d4026] font-display">
-                  Encounter &amp; Patient Selection
+                  Patient and visit
                 </h2>
               </div>
               {activeSession ? (
@@ -1522,7 +1583,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                   Step 2 of 3 · Required Before Capture
                 </span>
                 <h2 className="text-lg font-bold text-[#0d4026] font-display">
-                  Patient Recording Consent (Demo Implementation)
+                  Recording consent
                 </h2>
               </div>
               <StatusBadge tone={isConsentConfirmed ? 'success' : 'warning'}>
@@ -1612,7 +1673,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                   Step 3 of 3
                 </span>
                 <h2 className="text-lg sm:text-xl font-bold text-[#0d4026] font-display">
-                  Audio Capture &amp; Upload Controls
+                  Record the visit
                 </h2>
               </div>
 
@@ -1641,7 +1702,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                   }`}
                 >
                   <Mic className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Live Microphone</span>
+                  <span>Microphone</span>
                 </button>
                 <button
                   type="button"
@@ -1663,7 +1724,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                   }`}
                 >
                   <Upload className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Upload Audio File</span>
+                  <span>Attach audio file</span>
                 </button>
               </div>
             </div>
@@ -1732,23 +1793,12 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                   </div>
                 </div>
 
-                {/* Browser Codec & Compatibility Telemetry Bar */}
-                <div className="rounded-[10px] bg-[#f7f8f8] border border-[#d5e0db] p-3 text-xs grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <span className="text-[#495057] block">Negotiated Browser Format:</span>
-                    <strong className="font-mono text-[#0d4026]">
-                      {browserEnv.canRecordLiveMicrophone
-                        ? negotiatedMimeType || 'audio/webm'
-                        : 'Unsupported in current browser'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-[#495057] block">Target Transcription Format:</span>
-                    <strong className="font-mono text-[#00783c]">
-                      {browserEnv.targetTranscriptionFormat}
-                    </strong>
-                  </div>
-                </div>
+                <p className="text-xs text-[#495057]">
+                  Your browser will ask for microphone permission when you press Start.
+                  {browserEnv.canRecordLiveMicrophone
+                    ? ` Audio format: ${negotiatedMimeType || 'audio/webm'}.`
+                    : ''}
+                </p>
 
                 {/* Unsupported Browser Warning */}
                 {!browserEnv.canRecordLiveMicrophone && (
@@ -1879,8 +1929,23 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                           onClick={() => void handleStartRecording()}
                         >
                           {studioStage === 'permission_requested'
-                            ? 'Awaiting Permission…'
-                            : 'Start Recording'}
+                            ? 'Waiting for permission…'
+                            : 'Start recording'}
+                        </Button>
+                      )}
+
+                    {(studioStage === 'ready' || studioStage === 'failed') &&
+                      !capturedBlob &&
+                      !submittedRecording &&
+                      isDemoMode && (
+                        <Button
+                          variant="soft"
+                          size="md"
+                          disabled={!isConsentConfirmed}
+                          iconLeft={<Sparkles className="w-4 h-4" aria-hidden="true" />}
+                          onClick={() => void handleUseSimulatedAudio()}
+                        >
+                          No microphone? Use simulated demo audio
                         </Button>
                       )}
 
@@ -1893,7 +1958,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                             iconLeft={<Pause className="w-4 h-4" aria-hidden="true" />}
                             onClick={handlePauseRecording}
                           >
-                            Pause Recording
+                            Pause
                           </Button>
                         )}
                         <Button
@@ -1902,7 +1967,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                           iconLeft={<Square className="w-4 h-4" aria-hidden="true" />}
                           onClick={handleStopRecording}
                         >
-                          Stop Recording
+                          Stop
                         </Button>
                       </>
                     )}
@@ -1915,7 +1980,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                           iconLeft={<Play className="w-4 h-4" aria-hidden="true" />}
                           onClick={handleResumeRecording}
                         >
-                          Resume Recording
+                          Resume
                         </Button>
                         <Button
                           variant="danger"
@@ -1923,7 +1988,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                           iconLeft={<Square className="w-4 h-4" aria-hidden="true" />}
                           onClick={handleStopRecording}
                         >
-                          Stop Recording
+                          Stop
                         </Button>
                       </>
                     )}
@@ -2058,8 +2123,8 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                     <div>
                       <h3 className="text-base font-bold text-[#0d4026] font-display">
                         {submittedRecording
-                          ? `Submitted Recording (${submittedRecording.id})`
-                          : 'Local Audio Preview & Verification'}
+                          ? 'Saved recording'
+                          : 'Listen before saving'}
                       </h3>
                       <p className="text-xs text-[#495057]">
                         {submittedRecording
@@ -2093,7 +2158,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                       htmlFor="studio-audio-preview-player"
                       className="block text-xs font-bold text-[#0d4026]"
                     >
-                      Preview Captured Visit Audio (In-Memory Browser Playback)
+                      Play back the recording (kept in this browser only)
                     </label>
                     <audio
                       id="studio-audio-preview-player"
@@ -2101,12 +2166,16 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                       src={previewObjectUrl}
                       aria-label="Preview captured visit audio"
                       className="w-full h-10"
-                    />
+                    >
+                      {/* Local visit audio has no caption file; the transcript is reviewed on the next screen. */}
+                      <track kind="captions" />
+                    </audio>
                   </div>
                 ) : (
                   <p className="text-xs text-[#495057] italic">
-                    Audio metadata is recorded for this session, but the transient in-memory audio
-                    buffer is no longer present (e.g., after a browser page refresh).
+                    {submittedRecording?.origin === 'simulated_demo_audio'
+                      ? 'Simulated demo audio has no playable sound. It stands in for a real recording during the demonstration.'
+                      : 'The recording details are saved, but the audio itself was kept in browser memory and is gone after a page refresh.'}
                   </p>
                 )}
 
@@ -2142,14 +2211,12 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                           : handleUploadAudioFile())
                       }
                     >
-                      {isDemoMode
-                        ? 'Submit Audio to Capture Service (Simulated Demo)'
-                        : 'Submit Audio to Capture Service'}
+                      Save recording to visit
                     </Button>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00783c]">
                       <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-                      <span>Duplicate submission locked while audio is active</span>
+                      <span>Saved to this visit</span>
                     </span>
                   )}
                 </div>
@@ -2169,15 +2236,14 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                     <div className="flex flex-wrap items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-[#00783c]" aria-hidden="true" />
                       <h3 className="text-base sm:text-lg font-bold text-[#0d4026] font-display">
-                        Audio Capture Submitted for Encounter {activeSession.id}
+                        Recording saved for visit {activeSession.id}
                       </h3>
                     </div>
                     <p className="text-xs sm:text-sm text-[#242628] leading-relaxed">
-                      <strong>{activeSession.patientName}</strong> ({activeSession.visitType}) now
-                      has verified capture metadata (
-                      <strong>{submittedRecording.durationLabel}</strong> ·{' '}
-                      <code>{submittedRecording.mimeType}</code>) at lifecycle stage{' '}
-                      <strong>Recording ready</strong>.
+                      <strong>{activeSession.patientName}</strong> · {activeSession.visitType} ·{' '}
+                      {submittedRecording.durationLabel} ·{' '}
+                      {CAPTURE_ORIGIN_LABELS[submittedRecording.origin]}. Next, generate the draft
+                      report and review it.
                     </p>
                   </div>
                   <StatusBadge tone="success">Submitted</StatusBadge>
@@ -2186,17 +2252,12 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                 <div className="rounded-[10px] bg-white/90 border border-[#cde0d4] p-3 text-xs text-[#242628] space-y-1">
                   <strong className="text-[#0d4026] flex items-center gap-1.5">
                     <Info className="w-3.5 h-3.5 text-[#00783c] shrink-0" aria-hidden="true" />
-                    <span>
-                      Honest Lifecycle Separation (No Fictional Transcript Fabricated)
-                    </span>
+                    <span>About the draft</span>
                   </strong>
                   <p className="text-[#495057] leading-relaxed">
-                    In accordance with clinical safety rules, submitting audio in Sequence 4A does{' '}
-                    <strong>not</strong> fabricate a fake transcript or mark this encounter as AI
-                    processed. Speech transcription and AI SOAP report generation belong to{' '}
-                    <strong>Sequence 4B</strong>. Also note that in Demo Mode, the raw audio Blob is
-                    stored strictly in browser memory and will not survive a full browser page
-                    refresh.
+                    This demo has no transcription or AI service. The draft you will review is a{' '}
+                    <strong>simulated demo transcript and SOAP note</strong> for this patient. It is
+                    not produced from your recording, and the audio never leaves this browser.
                   </p>
                 </div>
 
@@ -2207,7 +2268,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                     iconLeft={<RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />}
                     onClick={handleStartFreshEncounter}
                   >
-                    Start Another Clinical Visit
+                    Record another visit
                   </Button>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -2218,77 +2279,45 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                     >
                       View in Clinical Sessions
                     </ButtonLink>
-                    <ButtonLink
-                      to={`/clinician/sessions/${activeSession.id}`}
-                      variant="primary"
-                      size="sm"
-                      iconRight={<ArrowRight className="w-4 h-4" aria-hidden="true" />}
-                    >
-                      Open Encounter {activeSession.id}
-                    </ButtonLink>
+                    {activeSession.processing.status === 'idle' ? (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={isStartingDraft}
+                        iconRight={<ArrowRight className="w-4 h-4" aria-hidden="true" />}
+                        onClick={() => void handleGenerateDraft()}
+                      >
+                        {isStartingDraft ? 'Starting…' : 'Generate draft and review'}
+                      </Button>
+                    ) : (
+                      <ButtonLink
+                        to={`/clinician/sessions/${activeSession.id}`}
+                        variant="primary"
+                        size="sm"
+                        iconRight={<ArrowRight className="w-4 h-4" aria-hidden="true" />}
+                      >
+                        Open visit {activeSession.id}
+                      </ButtonLink>
+                    )}
                   </div>
                 </div>
               </Card>
             )}
           </Card>
 
-          {/* Demo Mode vs. Connected Mode Architecture Explanation Card */}
-          <Card padding="md" className="space-y-3 bg-[#f7f8f8] border-[#d5e0db]">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-[#0d4026] font-display flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-[#00783c]" aria-hidden="true" />
-                <span>Demo Mode vs. Connected Mode Capture Architecture</span>
-              </h3>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#00783c]">
-                {isDemoMode ? 'Active: Demo Mode' : 'Active: Connected Mode'}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[#242628]">
-              <div className="rounded-[10px] bg-white border border-[#cde0d4] p-3 space-y-1">
-                <strong className="text-[#00783c] block">
-                  Demo Mode (Local Browser + In-Memory Registry)
-                </strong>
-                <p className="text-[#495057] leading-relaxed">
-                  Uses real browser <code>navigator.mediaDevices.getUserMedia</code> and{' '}
-                  <code>MediaRecorder</code> APIs for microphone capture and local playback.
-                  Submitting stores serializable metadata in <code>DemoStore</code> and keeps the
-                  raw <code>Blob</code> strictly in memory (<code>transientMediaRegistry</code>) —
-                  never in <code>sessionStorage</code> or <code>localStorage</code>.
-                </p>
-              </div>
-
-              <div className="rounded-[10px] bg-white border border-[#d5e0db] p-3 space-y-1">
-                <strong className="text-[#0d4026] block">
-                  Connected Mode (Typed Backend Service Adapters)
-                </strong>
-                <p className="text-[#495057] leading-relaxed">
-                  Routes capture requests through <code>ICaptureService</code> (
-                  <code>/sessions/:id/recordings/live</code> and{' '}
-                  <code>/sessions/:id/recordings/upload</code>) for server-side normalization to{' '}
-                  <code>audio/wav;rate=16000;channels=1</code>. Surfaces missing backend errors
-                  honestly without faking upload success.
-                </p>
-              </div>
-            </div>
-
-            {activeSession && (
-              <div className="pt-2 border-t border-[#d5e0db] flex flex-wrap items-center justify-between gap-2 text-xs text-[#495057]">
-                <span className="inline-flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-[#00783c]" aria-hidden="true" />
-                  <span>
-                    Active Encounter: <strong>{activeSession.id}</strong> · Updated{' '}
-                    {formatTimeShort(activeSession.updatedAt)}
-                  </span>
-                </span>
-                <span>
-                  Capture Status:{' '}
-                  <strong className="text-[#0d4026]">
-                    {activeSession.capture.status.replace(/_/g, ' ')}
-                  </strong>
-                </span>
-              </div>
-            )}
+          <Card padding="sm" className="bg-[#f7f8f8] border-[#d5e0db] text-xs text-[#495057] space-y-1">
+            <p className="flex items-center gap-1.5 font-bold text-[#0d4026]">
+              <ShieldAlert className="w-4 h-4 text-[#00783c]" aria-hidden="true" />
+              <span>Where the audio goes</span>
+            </p>
+            <p className="leading-relaxed">
+              {isDemoMode
+                ? 'In this demo the recording is held only in this browser tab’s memory. It is never uploaded or written to storage, and it disappears when you refresh or leave.'
+                : 'Recordings are sent through the configured capture service.'}
+              {activeSession
+                ? ` Visit ${activeSession.id} · updated ${formatTimeShort(activeSession.updatedAt)}.`
+                : ''}
+            </p>
           </Card>
         </div>
       </div>

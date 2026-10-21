@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useBlocker, useLocation, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   ClipboardCheck,
@@ -12,6 +11,7 @@ import {
   Info,
   Mic,
   RefreshCw,
+  MessageSquareWarning,
   RotateCcw,
   Save,
   ShieldCheck,
@@ -28,9 +28,12 @@ import { StepProgress } from '../../design-system/components/StepProgress';
 import { ROLE_WORKSPACE_LABELS } from '../../design-system/layouts/Sidebar';
 import type { SoapSectionKey, SoapSections } from '../../domain/models';
 import {
+  canRejectAndRegenerateDraft,
   canSaveOrEditDraft,
   deriveSessionDisplayState,
 } from '../../domain/state-machines';
+import type { SessionReviewBundle } from '../../services/contracts';
+import { ProcessingStatusPanel } from './ProcessingStatusPanel';
 import { ClarificationWorkbenchPanel } from './ClarificationWorkbenchPanel';
 import { ClinicalSignOffAndReleasePanel } from './ClinicalSignOffAndReleasePanel';
 import { SoapReportEditorPanel } from './SoapReportEditorPanel';
@@ -67,6 +70,9 @@ export function ClinicalSessionDetailPage() {
   const [mobileTab, setMobileTab] = useState<MobileWorkbenchTab>('report');
   const [isMutating, setIsMutating] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState<string | null>(null);
   const [saveFeedback, setSaveFeedback] = useState<{
     readonly tone: 'success' | 'error';
     readonly message: string;
@@ -88,6 +94,13 @@ export function ClinicalSessionDetailPage() {
     queryKey: ['audit-events'],
     queryFn: () => services.admin.listAuditEvents(),
   });
+
+  const handleBundleUpdated = useCallback(
+    (updated: SessionReviewBundle) => {
+      queryClient.setQueryData(['session-review-bundle', updated.session.id], updated);
+    },
+    [queryClient],
+  );
 
   const session = bundle?.session;
   const transcript = bundle?.transcript;
@@ -360,6 +373,40 @@ export function ClinicalSessionDetailPage() {
     }
   };
 
+  const canRequestChanges = Boolean(report) && canRejectAndRegenerateDraft(currentUser, session);
+  const isPipelineBusy =
+    derived.code === 'PROCESSING' ||
+    derived.code === 'REGENERATING_DRAFT' ||
+    derived.code === 'PROCESSING_INTERRUPTED';
+
+  const handleRequestChanges = async () => {
+    if (!report) return;
+    const reason = rejectReason.trim();
+    if (reason.length < 10) {
+      setRejectError('Describe what needs to change (at least 10 characters).');
+      return;
+    }
+    setIsMutating(true);
+    setRejectError(null);
+    try {
+      const updatedBundle = await services.review.rejectAndRegenerate({
+        sessionId: session.id,
+        expectedRevision: report.currentRevision,
+        rejectionReason: reason,
+      });
+      queryClient.setQueryData(['session-review-bundle', session.id], updatedBundle);
+      setDraftSoapOverrides({});
+      setDraftClarificationAnswers({});
+      setRejectDialogOpen(false);
+      setRejectReason('');
+      await invalidateWorkspaceQueries(queryClient);
+    } catch (err) {
+      setRejectError(err instanceof Error ? err.message : 'Could not request a revised draft.');
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   const isDiscardDialogOpen = confirmDiscardOpen || blocker.state === 'blocked';
 
   return (
@@ -403,6 +450,65 @@ export function ClinicalSessionDetailPage() {
               onClick={handleDiscardAllUnsaved}
             >
               Discard Unsaved Changes
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Request Changes (Reject Draft) Dialog */}
+      <Dialog
+        open={rejectDialogOpen}
+        onOpenChange={(open) => {
+          setRejectDialogOpen(open);
+          if (!open) setRejectError(null);
+        }}
+        title="Request changes to this draft?"
+        description="The current draft is kept in the report history, and a revised draft is prepared."
+      >
+        <div className="space-y-4">
+          {hasUnsavedChanges && (
+            <p className="text-sm text-[#9a4406] font-semibold">
+              Your unsaved edits on this page will be discarded.
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <label htmlFor="reject-reason" className="block text-sm font-bold text-[#0d4026]">
+              What needs to change?
+            </label>
+            <textarea
+              id="reject-reason"
+              rows={4}
+              value={rejectReason}
+              onChange={(e) => {
+                setRejectReason(e.target.value);
+                setRejectError(null);
+              }}
+              aria-describedby={rejectError ? 'reject-reason-error' : 'reject-reason-hint'}
+              aria-invalid={rejectError ? true : undefined}
+              className="w-full rounded-[10px] border border-[#b5c7be] bg-white px-3.5 py-2.5 text-sm text-[#242628] focus:border-[#00783c] focus:outline-none focus:ring-2 focus:ring-[#00783c]/20"
+            />
+            {rejectError ? (
+              <p id="reject-reason-error" role="alert" className="text-xs font-semibold text-[var(--color-danger)]">
+                {rejectError}
+              </p>
+            ) : (
+              <p id="reject-reason-hint" className="text-xs text-[#495057]">
+                Example: “Assessment should mention the patient’s weight change.” In this demo the
+                revised draft is simulated; your feedback is saved to the report history.
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-[#e4ece7]">
+            <Button variant="secondary" size="sm" onClick={() => setRejectDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={isMutating}
+              onClick={() => void handleRequestChanges()}
+            >
+              {isMutating ? 'Sending…' : 'Request revised draft'}
             </Button>
           </div>
         </div>
@@ -597,6 +703,17 @@ export function ClinicalSessionDetailPage() {
                     Discard Changes
                   </Button>
                 )}
+                {canRequestChanges && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={isMutating}
+                    iconLeft={<MessageSquareWarning className="w-4 h-4" aria-hidden="true" />}
+                    onClick={() => setRejectDialogOpen(true)}
+                  >
+                    Request changes
+                  </Button>
+                )}
                 <Button
                   variant="primary"
                   size="sm"
@@ -622,6 +739,15 @@ export function ClinicalSessionDetailPage() {
           </div>
         </div>
       </Card>
+
+      {report && isPipelineBusy && (
+        <ProcessingStatusPanel
+          session={session}
+          recording={bundle.recording}
+          derived={derived}
+          onBundleUpdated={handleBundleUpdated}
+        />
+      )}
 
       {/* Mobile / Tablet Workbench Mode Switcher (< 1024px) */}
       <div
@@ -732,19 +858,12 @@ export function ClinicalSessionDetailPage() {
               />
             </>
           ) : (
-            <Card padding="md" className="space-y-3">
-              <div className="flex items-center gap-2 text-[#0d4026]">
-                <AlertTriangle className="w-5 h-5 text-[#f26b21]" aria-hidden="true" />
-                <h2 className="text-lg font-bold font-display">
-                  Clinical report draft not yet generated
-                </h2>
-              </div>
-              <p className="text-sm text-[#495057] leading-relaxed">
-                Session <strong>{session.id}</strong> ({session.patientName} · {session.visitType})
-                has not completed the structured report generation stage yet. Inspect the pipeline
-                stages on the right to see current progress.
-              </p>
-            </Card>
+            <ProcessingStatusPanel
+              session={session}
+              recording={bundle.recording}
+              derived={derived}
+              onBundleUpdated={handleBundleUpdated}
+            />
           )}
         </div>
 
