@@ -368,12 +368,13 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
       navigator.mediaDevices &&
       typeof navigator.mediaDevices.addEventListener === 'function'
     ) {
+      const mediaDevices = navigator.mediaDevices;
       const handleDeviceChange = () => {
         void refreshMicrophoneDevices();
       };
-      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+      mediaDevices.addEventListener('devicechange', handleDeviceChange);
       return () => {
-        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+        mediaDevices.removeEventListener('devicechange', handleDeviceChange);
       };
     }
     return undefined;
