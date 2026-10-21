@@ -10,14 +10,14 @@ import {
   isNavItemActive,
 } from './Sidebar';
 
-const PRIMARY_CTA_BY_ROLE: Record<
+const FALLBACK_CTA_BY_ROLE: Record<
   UserRole,
-  { readonly label: string; readonly to: string }
+  { readonly label: string; readonly to: string } | null
 > = {
-  clinician: { label: 'Start Clinical Visit', to: '/clinician/sessions/new' },
-  patient: { label: 'My Visit Reports', to: '/patient/reports' },
-  analyst: { label: 'Cohort Explorer', to: '/analyst/analytics?view=cohort' },
-  admin: { label: 'Audit Trail', to: '/admin?tab=audit' },
+  clinician: null,
+  patient: { label: 'My reports', to: '/patient/reports' },
+  analyst: null,
+  admin: null,
 };
 
 const PUBLIC_LOGIN_LINKS: readonly {
@@ -44,8 +44,15 @@ export function TopBar({
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
 
-  const navItems = ROLE_NAV_ITEMS[currentUser.role];
-  const primaryCta = PRIMARY_CTA_BY_ROLE[currentUser.role];
+  const allNavItems = ROLE_NAV_ITEMS[currentUser.role];
+  const navItems = allNavItems.filter((item) => !item.isPrimaryAction);
+  const primaryActionItem = allNavItems.find((item) => item.isPrimaryAction);
+  const primaryCta = primaryActionItem
+    ? { label: primaryActionItem.label, to: primaryActionItem.to }
+    : FALLBACK_CTA_BY_ROLE[currentUser.role];
+  const isPrimaryCtaActive = primaryActionItem
+    ? isNavItemActive(primaryActionItem, location.pathname, searchParams)
+    : false;
 
   const handleUtilityRoleJump = async (role: UserRole, to: string) => {
     await switchDemoRole(role);
@@ -72,34 +79,39 @@ export function TopBar({
           </div>
 
           {/* Right Parkview-Style Utility Navigation Links */}
-          <div className="flex items-center justify-between sm:justify-end gap-x-2.5 sm:gap-x-5 w-full lg:w-auto lg:ml-auto whitespace-nowrap">
+          <div
+            role="group"
+            aria-label="Switch demo role"
+            className="flex items-center justify-between sm:justify-end gap-x-2.5 sm:gap-x-5 w-full lg:w-auto lg:ml-auto whitespace-nowrap"
+          >
+            <span className="hidden sm:inline text-white/80 font-medium">Demo role:</span>
             <button
               type="button"
               onClick={() => void handleUtilityRoleJump('clinician', '/clinician/dashboard')}
               className="hover:underline underline-offset-4 cursor-pointer text-white/95 hover:text-white"
             >
-              Clinician Desk
+              Clinician
             </button>
             <button
               type="button"
               onClick={() => void handleUtilityRoleJump('analyst', '/analyst/analytics?view=cohort')}
               className="hidden sm:inline hover:underline underline-offset-4 cursor-pointer text-white/95 hover:text-white"
             >
-              Medical Analytics
+              Analyst
             </button>
             <button
               type="button"
               onClick={() => void handleUtilityRoleJump('admin', '/admin?tab=overview')}
               className="hidden md:inline hover:underline underline-offset-4 cursor-pointer text-white/95 hover:text-white"
             >
-              Governance
+              Admin
             </button>
             <button
               type="button"
               onClick={() => void handleUtilityRoleJump('patient', '/patient')}
               className="hover:underline underline-offset-4 cursor-pointer text-white/95 hover:text-white"
             >
-              Patient Portal
+              Patient
             </button>
             <Link
               to="/login"
@@ -173,15 +185,22 @@ export function TopBar({
                 onClick={() => void handleUtilityRoleJump('clinician', '/clinician/dashboard')}
                 className="whitespace-nowrap shrink-0 inline-flex items-center justify-center bg-[#02754b] hover:bg-[#056233] text-white font-bold text-[14px] xl:text-[15px] px-5 py-2.5 rounded-[12px] shadow-xs transition-colors cursor-pointer"
               >
-                Find Care Workspace
+                Open clinician workspace
               </button>
             ) : (
-              <Link
-                to={primaryCta.to}
-                className="whitespace-nowrap shrink-0 inline-flex items-center justify-center bg-[#02754b] hover:bg-[#056233] text-white font-bold text-[14px] xl:text-[15px] px-5 py-2.5 rounded-[12px] shadow-xs transition-colors"
-              >
-                {primaryCta.label}
-              </Link>
+              primaryCta && (
+                <Link
+                  to={primaryCta.to}
+                  aria-current={isPrimaryCtaActive ? 'page' : undefined}
+                  className={[
+                    'whitespace-nowrap shrink-0 inline-flex items-center justify-center gap-2 text-white font-bold text-[14px] xl:text-[15px] px-5 py-2.5 rounded-[12px] shadow-xs transition-colors',
+                    isPrimaryCtaActive ? 'bg-[#0d4026] ring-2 ring-offset-2 ring-[#02754b]' : 'bg-[#02754b] hover:bg-[#056233]',
+                  ].join(' ')}
+                >
+                  {primaryActionItem?.icon}
+                  {primaryCta.label}
+                </Link>
+              )
             )}
           </div>
 

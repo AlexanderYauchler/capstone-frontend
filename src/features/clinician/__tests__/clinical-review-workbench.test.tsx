@@ -266,7 +266,7 @@ describe('CoSign Sequence 3B — Functional Clinical Review Workbench', () => {
     });
     renderWorkbench(['/clinician/sessions/CS-1042'], patientStore);
     expect(
-      await screen.findByRole('heading', { name: /Role scope restriction/i }),
+      await screen.findByRole('heading', { name: /Access restricted/i }),
     ).toBeInTheDocument();
   });
 

@@ -330,6 +330,10 @@ export interface ClinicalReport {
 // ----------------------------------------------------------------------------
 // Analytics, Audit & Settings Models
 // ----------------------------------------------------------------------------
+export type AgeGroup = '18-39' | '40-64' | '65+';
+export type AdministrativeSex = 'female' | 'male';
+export type AnalyticsReportStatus = 'finalized' | 'awaiting_review';
+
 export interface AnalyticsFilterCriteria {
   readonly view: 'cohort' | 'monthly';
   readonly monthKey: string; // e.g. "2026-09", "2026-10", "2026-08", "all"
@@ -338,6 +342,56 @@ export interface AnalyticsFilterCriteria {
   readonly department: DepartmentId | 'all';
   readonly diagnosis: DiagnosisCategory | 'all';
   readonly documentationStatus: 'verified_only' | 'all_statuses';
+  readonly ageGroup: AgeGroup | 'all';
+  readonly sex: AdministrativeSex | 'all';
+  readonly reportStatus: AnalyticsReportStatus | 'all';
+}
+
+/**
+ * One de-identified visit in the analytics dataset. Contains no names, IDs,
+ * or free text; only coarse categories (Safe Harbor style generalization).
+ */
+export interface DeidentifiedVisitRecord {
+  readonly recordKey: string;
+  readonly encounterDate: string; // "YYYY-MM-DD"
+  readonly department: DepartmentId;
+  readonly diagnosis: DiagnosisCategory;
+  readonly primarySymptom: ClinicalSession['primarySymptom'];
+  readonly ageGroup: AgeGroup;
+  readonly sex: AdministrativeSex;
+  readonly reportStatus: AnalyticsReportStatus;
+  readonly releasedToPatient: boolean;
+  readonly followUpDocumented: boolean;
+  readonly hadClarifications: boolean;
+  readonly reviewMinutes: number | null; // null until the report is finalized
+  readonly privacyVerified: boolean;
+}
+
+export interface CategoryBreakdownRow {
+  readonly key: string;
+  readonly label: string;
+  readonly metric: SuppressedMetricValue;
+}
+
+export interface MonthlyKpiSummary {
+  readonly monthKey: string;
+  readonly monthLabel: string;
+  readonly totalSessions: number;
+  readonly completedReports: number;
+  readonly awaitingReview: number;
+  readonly releasedReports: number;
+  readonly completionRatePct: number | null;
+  readonly medianReviewMinutes: number | null;
+  readonly sessionsWithClarifications: number;
+}
+
+export interface MonthlyTrendPoint {
+  readonly monthKey: string;
+  readonly monthLabel: string;
+  readonly shortLabel: string;
+  readonly totalSessions: number;
+  readonly completedReports: number;
+  readonly awaitingReview: number;
 }
 
 export interface SuppressedMetricValue {
@@ -379,6 +433,20 @@ export interface AnalyticsSummaryResponse {
   }[];
   readonly suppressedRareCombinationsNote: string;
   readonly monthlyOperations: readonly MonthlyOperationsRow[];
+  // Added for the interactive analytics screens (frontend contract extension).
+  readonly datasetRecordCount: number;
+  readonly availableMonths: ReadonlyArray<{ readonly monthKey: string; readonly label: string }>;
+  readonly datasetDateRange: { readonly from: string; readonly to: string };
+  readonly ageGroupBreakdown: readonly CategoryBreakdownRow[];
+  readonly sexBreakdown: readonly CategoryBreakdownRow[];
+  readonly diagnosisBreakdown: readonly CategoryBreakdownRow[];
+  readonly monthlyKpis: MonthlyKpiSummary;
+  readonly monthlyTrend: readonly MonthlyTrendPoint[];
+  readonly monthlyDiagnosisCounts: ReadonlyArray<{
+    readonly key: DiagnosisCategory;
+    readonly label: string;
+    readonly count: number;
+  }>;
 }
 
 export type AuditActionType =

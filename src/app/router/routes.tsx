@@ -1,5 +1,15 @@
 import { Navigate, type RouteObject } from 'react-router';
+import { AdminPage } from '../../features/admin/AdminPage';
+import { AnalyticsPage } from '../../features/analytics/AnalyticsPage';
 import { RoleSelectionPage } from '../../features/auth/RoleSelectionPage';
+import { ClinicalVisitCapturePage } from '../../features/clinician/ClinicalVisitCapturePage';
+import {
+  ClinicalSessionHistoryPage,
+  ClinicalSessionPrivacyPage,
+  ClinicalSessionSummaryPage,
+} from '../../features/clinician/ClinicalSessionSubpages';
+import { ReviewQueuePage } from '../../features/clinician/ReviewQueuePage';
+import { SettingsPage } from '../../features/settings/SettingsPage';
 import { ClinicianDashboardPage } from '../../features/clinician/ClinicianDashboardPage';
 import { ClinicalSessionDetailPage } from '../../features/clinician/ClinicalSessionDetailPage';
 import { ClinicalSessionsPage } from '../../features/clinician/ClinicalSessionsPage';
@@ -7,10 +17,9 @@ import { PatientReportDetailPage } from '../../features/patient/PatientReportDet
 import { PatientReportsListPage } from '../../features/patient/PatientReportsListPage';
 import { NotFoundPage } from './NotFoundPage';
 import { RoleGuard } from './RoleGuard';
-import { SequencePlaceholderPage } from './SequencePlaceholderPage';
 
 // ============================================================================
-// CoSign — Verified Route Architecture Table (Sequence 3A)
+// CoSign — Route table (every route renders a working screen)
 // ============================================================================
 
 export const appRoutes: RouteObject[] = [
@@ -38,78 +47,39 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: '/clinician/sessions/new',
-        element: (
-          <SequencePlaceholderPage
-            title="Start a clinical visit"
-            subtitle="Confirm the visit details and patient consent before recording."
-            sequenceTarget="Sequence 4"
-          />
-        ),
+        element: <ClinicalVisitCapturePage key="new-visit" />,
       },
       {
         path: '/clinician/sessions/upload',
-        element: (
-          <SequencePlaceholderPage
-            title="Upload a clinical recording"
-            subtitle="Use a consented, pre-recorded visit as an alternative to live recording."
-            sequenceTarget="Sequence 4"
-          />
-        ),
+        element: <ClinicalVisitCapturePage key="upload-visit" defaultMode="upload" />,
       },
       {
         path: '/clinician/sessions/:sessionId/record',
-        element: (
-          <SequencePlaceholderPage
-            title="Record clinical visit"
-            subtitle="Live browser audio capture or explicitly labeled simulated demo recording."
-            sequenceTarget="Sequence 4"
-          />
-        ),
+        element: <ClinicalVisitCapturePage key="record-visit" />,
       },
       {
         path: '/clinician/sessions/:sessionId',
         element: <ClinicalSessionDetailPage />,
       },
       {
+        path: '/clinician/reviews',
+        element: <ReviewQueuePage />,
+      },
+      {
         path: '/clinician/sessions/:sessionId/summary',
-        element: (
-          <SequencePlaceholderPage
-            title="Collected data summary"
-            subtitle="Structured visit information remains a draft until clinician approval."
-            sequenceTarget="Sequence 3"
-          />
-        ),
+        element: <ClinicalSessionSummaryPage />,
       },
       {
         path: '/clinician/sessions/:sessionId/privacy',
-        element: (
-          <SequencePlaceholderPage
-            title="Preparing de-identified analytics"
-            subtitle="The finalized clinical report stays separate from the analytics record."
-            sequenceTarget="Sequence 3"
-          />
-        ),
+        element: <ClinicalSessionPrivacyPage />,
       },
       {
         path: '/clinician/sessions/:sessionId/history',
-        element: (
-          <SequencePlaceholderPage
-            title="Clinical report history"
-            subtitle="Clinician edits, approvals, and release actions are traceable."
-            sequenceTarget="Sequence 3"
-          />
-        ),
+        element: <ClinicalSessionHistoryPage />,
       },
       {
         path: '/clinician/analytics',
-        element: (
-          <SequencePlaceholderPage
-            title="Healthcare analytics"
-            subtitle="Explore clinical patterns using de-identified aggregate demonstration data."
-            sequenceTarget="Sequence 4"
-            kind="analytics"
-          />
-        ),
+        element: <AnalyticsPage />,
       },
     ],
   },
@@ -143,14 +113,7 @@ export const appRoutes: RouteObject[] = [
     children: [
       {
         path: '/analyst/analytics',
-        element: (
-          <SequencePlaceholderPage
-            title="Healthcare analytics"
-            subtitle="Explore clinical patterns using de-identified aggregate demonstration data."
-            sequenceTarget="Sequence 4"
-            kind="analytics"
-          />
-        ),
+        element: <AnalyticsPage />,
       },
     ],
   },
@@ -161,13 +124,7 @@ export const appRoutes: RouteObject[] = [
     children: [
       {
         path: '/admin',
-        element: (
-          <SequencePlaceholderPage
-            title="Administration workspace"
-            subtitle="Manage role access and inspect workspace activity."
-            sequenceTarget="Sequence 4"
-          />
-        ),
+        element: <AdminPage />,
       },
     ],
   },
@@ -178,13 +135,7 @@ export const appRoutes: RouteObject[] = [
     children: [
       {
         path: '/settings',
-        element: (
-          <SequencePlaceholderPage
-            title="Workspace settings"
-            subtitle="Preferences for your role and clinical workspace."
-            sequenceTarget="Sequence 4"
-          />
-        ),
+        element: <SettingsPage />,
       },
     ],
   },

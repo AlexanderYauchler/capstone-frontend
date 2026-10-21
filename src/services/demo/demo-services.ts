@@ -6,10 +6,10 @@ import type {
   AuditEvent,
   ClinicalReport,
   ClinicalSession,
+  DeidentifiedVisitRecord,
   ProcessingLifecycleState,
   RecordingMetadata,
   SoapSections,
-  SuppressedMetricValue,
   User,
   UserRole,
   WorkspacePreferences,
@@ -42,39 +42,14 @@ import type {
 } from '../contracts';
 import { DEMO_USERS } from './fixtures';
 import { buildSimulatedVisitDraft } from './fixtures/simulated-draft';
+import { generateSyntheticAnalyticsDataset } from './fixtures/analytics-dataset';
+import { computeAnalyticsSummary } from '../../domain/analytics';
 import type { DemoStore } from './demo-store';
 import { transientMediaRegistry } from './transient-media-registry';
 
 // ============================================================================
 // CoSign — Demo Mode Service Adapters
 // ============================================================================
-
-function formatSuppressedMetric(rawCount: number, total: number): SuppressedMetricValue {
-  if (rawCount > 0 && rawCount < 5) {
-    return {
-      count: null,
-      percentage: null,
-      isSuppressed: true,
-      displayLabel: 'Suppressed (<5)',
-    };
-  }
-  const pct = total > 0 ? Math.round((rawCount / total) * 100) : null;
-  if (total - rawCount > 0 && total - rawCount < 5) {
-    // Complementary suppression when complement is < 5
-    return {
-      count: null,
-      percentage: null,
-      isSuppressed: true,
-      displayLabel: 'Suppressed (complementary <5)',
-    };
-  }
-  return {
-    count: rawCount,
-    percentage: pct,
-    isSuppressed: false,
-    displayLabel: `${rawCount}`,
-  };
-}
 
 function sanitizeReportForPatient(report: ClinicalReport): ClinicalReport {
   return {
@@ -143,6 +118,11 @@ function formatDurationLabel(durationSeconds: number): string {
 }
 
 export function createDemoServices(store: DemoStore): ICoSignServices {
+  let analyticsDatasetCache: {
+    readonly referenceDate: string;
+    readonly records: readonly DeidentifiedVisitRecord[];
+  } | null = null;
+
   const getCurrentUserSync = (): User => {
     const role = store.getState().activeRole ?? 'clinician';
     return DEMO_USERS.find((u) => u.role === role) ?? DEMO_USERS[0]!;
@@ -1477,93 +1457,14 @@ export function createDemoServices(store: DemoStore): ICoSignServices {
       async getAggregateSummary(
         partialCriteria: Partial<AnalyticsFilterCriteria>,
       ): Promise<AnalyticsSummaryResponse> {
-        const criteria: AnalyticsFilterCriteria = {
-          view: partialCriteria.view ?? 'cohort',
-          monthKey: partialCriteria.monthKey ?? '2026-09',
-          dateFrom: partialCriteria.dateFrom ?? '2026-09-01',
-          dateTo: partialCriteria.dateTo ?? '2026-09-30',
-          department: partialCriteria.department ?? 'all',
-          diagnosis: partialCriteria.diagnosis ?? 'all',
-          documentationStatus: partialCriteria.documentationStatus ?? 'verified_only',
-        };
-
-        const isDiabetesFiltered = criteria.diagnosis === 'diabetes';
-        const verifiedVisitsCount = isDiabetesFiltered ? 72 : 240;
-        const followUpRaw = isDiabetesFiltered ? 60 : 192;
-
-        return {
-          criteria,
-          minimumCellSizeThreshold: 5,
-          isCohortSuppressed: verifiedVisitsCount > 0 && verifiedVisitsCount < 5,
-          verifiedVisitsCount,
-          followUpDocumented: formatSuppressedMetric(followUpRaw, verifiedVisitsCount),
-          topSymptom: {
-            symptom: 'Fatigue',
-            metric: formatSuppressedMetric(isDiabetesFiltered ? 32 : 84, verifiedVisitsCount),
-          },
-          weeklyVisitTrends: isDiabetesFiltered
-            ? [
-                { weekLabel: '1–7', metric: formatSuppressedMetric(15, 72) },
-                { weekLabel: '8–14', metric: formatSuppressedMetric(18, 72) },
-                { weekLabel: '15–21', metric: formatSuppressedMetric(17, 72) },
-                { weekLabel: '22–30', metric: formatSuppressedMetric(22, 72) },
-              ]
-            : [
-                { weekLabel: '1–7', metric: formatSuppressedMetric(52, 240) },
-                { weekLabel: '8–14', metric: formatSuppressedMetric(58, 240) },
-                { weekLabel: '15–21', metric: formatSuppressedMetric(61, 240) },
-                { weekLabel: '22–30', metric: formatSuppressedMetric(69, 240) },
-              ],
-          symptomDistribution: isDiabetesFiltered
-            ? [
-                { symptom: 'Fatigue', metric: formatSuppressedMetric(32, 72) },
-                { symptom: 'Increased thirst', metric: formatSuppressedMetric(24, 72) },
-                { symptom: 'Other', metric: formatSuppressedMetric(16, 72) },
-              ]
-            : [
-                { symptom: 'Fatigue', metric: formatSuppressedMetric(84, 240) },
-                { symptom: 'Cough', metric: formatSuppressedMetric(60, 240) },
-                { symptom: 'Headache', metric: formatSuppressedMetric(48, 240) },
-                { symptom: 'Increased thirst', metric: formatSuppressedMetric(36, 240) },
-                { symptom: 'Other', metric: formatSuppressedMetric(12, 240) },
-              ],
-          suppressedRareCombinationsNote: 'Rare combinations: Suppressed (<5)',
-          monthlyOperations: [
-            {
-              monthKey: '2026-08',
-              monthLabel: 'August 2026',
-              sessionsCreated: 218,
-              pendingReviewsAtPeriodEnd: 0,
-              finalizedReports: 218,
-              releasedReports: 214,
-              sessionsWithClarifications: 38,
-              clarificationResolutionRatePct: 100,
-              medianReviewDurationSeconds: 210,
-            },
-            {
-              monthKey: '2026-09',
-              monthLabel: 'September 2026',
-              sessionsCreated: 241, // Includes 1 session created Sept 30 and finalized Oct 1
-              pendingReviewsAtPeriodEnd: 1,
-              finalizedReports: 240,
-              releasedReports: 236,
-              sessionsWithClarifications: 44,
-              clarificationResolutionRatePct: 100,
-              medianReviewDurationSeconds: 195,
-            },
-            {
-              monthKey: '2026-10',
-              monthLabel: 'October 2026 (Through Oct 6)',
-              sessionsCreated: 42,
-              pendingReviewsAtPeriodEnd: 3, // CS-1047, CS-1046, CS-1042
-              finalizedReports: 38, // Includes Sept 30 carry-over finalized Oct 1
-              releasedReports: 37,
-              sessionsWithClarifications: 9,
-              clarificationResolutionRatePct: 89,
-              medianReviewDurationSeconds: 188,
-            },
-          ],
-        };
+        const referenceDate = store.getState().referenceDate;
+        if (!analyticsDatasetCache || analyticsDatasetCache.referenceDate !== referenceDate) {
+          analyticsDatasetCache = {
+            referenceDate,
+            records: generateSyntheticAnalyticsDataset(referenceDate),
+          };
+        }
+        return computeAnalyticsSummary(analyticsDatasetCache.records, partialCriteria, referenceDate);
       },
     },
 

@@ -31,7 +31,7 @@ describe('CoSign Sequence 2 — Role Selection, Layout & Route Navigation', () =
     expect(screen.getByRole('button', { name: /Explore analyst view/i })).toBeInTheDocument();
   });
 
-  it('navigates to Clinician workspace with independent Analytics and Monthly analytics sidebar items', async () => {
+  it('shows clinician navigation with one active item and switches analytics views in-page', async () => {
     const user = userEvent.setup();
     renderWithRouter(['/login']);
 
@@ -42,29 +42,44 @@ describe('CoSign Sequence 2 — Role Selection, Layout & Route Navigation', () =
     ).toBeInTheDocument();
 
     const desktopNav = screen.getAllByRole('navigation', { name: /clinician navigation/i })[0]!;
+    for (const label of [/^Dashboard$/i, /^Clinical sessions$/i, /^Reports & review$/i, /^Analytics$/i]) {
+      expect(within(desktopNav).getByRole('link', { name: label })).toBeInTheDocument();
+    }
+    expect(within(desktopNav).getByRole('link', { name: /^Dashboard$/i })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    // The primary "New recording" action is always visible
+    expect(screen.getAllByRole('link', { name: /New recording/i }).length).toBeGreaterThan(0);
+
     const analyticsLink = within(desktopNav).getByRole('link', { name: /^Analytics$/i });
-    const monthlyAnalyticsLink = within(desktopNav).getByRole('link', {
-      name: /^Monthly analytics$/i,
-    });
+    await user.click(analyticsLink);
+    expect(await screen.findByRole('heading', { level: 1, name: /^Healthcare analytics$/i })).toBeInTheDocument();
+    expect(analyticsLink).toHaveAttribute('aria-current', 'page');
 
-    expect(analyticsLink).toBeInTheDocument();
-    expect(monthlyAnalyticsLink).toBeInTheDocument();
-
-    // Navigate directly to Monthly analytics via the dedicated sidebar item
-    await user.click(monthlyAnalyticsLink);
-
+    await user.click(screen.getByRole('link', { name: /Monthly operations/i }));
     expect(
       await screen.findByRole('heading', { name: /Monthly documentation analytics/i }),
     ).toBeInTheDocument();
-    expect(monthlyAnalyticsLink).toHaveAttribute('aria-current', 'page');
-    expect(analyticsLink).not.toHaveAttribute('aria-current', 'page');
+    expect(analyticsLink).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('marks New recording (not Clinical sessions) active on the recording page', async () => {
+    renderWithRouter(['/clinician/sessions/new']);
+    expect(await screen.findByRole('heading', { level: 1, name: /Record a clinical visit/i })).toBeInTheDocument();
+    const desktopNav = screen.getAllByRole('navigation', { name: /clinician navigation/i })[0]!;
+    expect(within(desktopNav).getByRole('link', { name: /^Clinical sessions$/i })).not.toHaveAttribute(
+      'aria-current',
+    );
+    const cta = screen.getAllByRole('link', { name: /New recording/i })[0]!;
+    expect(cta).toHaveAttribute('aria-current', 'page');
   });
 
   it('enforces RoleGuard when a Clinician attempts to open an Admin-only route', () => {
     renderWithRouter(['/admin']);
 
     expect(
-      screen.getByRole('heading', { name: /Role scope restriction/i }),
+      screen.getByRole('heading', { name: /Access restricted/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /Return to role selection/i }),
@@ -146,7 +161,7 @@ describe('CoSign Sequence 2 — Role Selection, Layout & Route Navigation', () =
       await screen.findByRole('heading', { name: /Healthcare analytics/i }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: /Role scope restriction/i }),
+      screen.queryByRole('heading', { name: /Access restricted/i }),
     ).not.toBeInTheDocument();
     refreshedAnalystRender.unmount();
   });
@@ -158,7 +173,7 @@ describe('CoSign Sequence 2 — Role Selection, Layout & Route Navigation', () =
     // Switch to Admin role (/admin?tab=overview)
     await user.click(screen.getByRole('button', { name: /Explore administrator view/i }));
     expect(
-      await screen.findByRole('heading', { level: 1, name: /^Administration workspace$/i }),
+      await screen.findByRole('heading', { level: 1, name: /^Administration$/i }),
     ).toBeInTheDocument();
 
     // Click "Reset demo state" while in the Admin workspace
@@ -178,7 +193,7 @@ describe('CoSign Sequence 2 — Role Selection, Layout & Route Navigation', () =
     // Valid demoRole=admin allows direct entry into /admin
     const validRender = renderWithRouter(['/admin?demoRole=admin']);
     expect(
-      await screen.findByRole('heading', { level: 1, name: /^Administration workspace$/i }),
+      await screen.findByRole('heading', { level: 1, name: /^Administration$/i }),
     ).toBeInTheDocument();
     validRender.unmount();
 
@@ -187,7 +202,7 @@ describe('CoSign Sequence 2 — Role Selection, Layout & Route Navigation', () =
     // Invalid demoRole=super_hacker is ignored and falls back to default clinician role (which RoleGuard blocks on /admin)
     renderWithRouter(['/admin?demoRole=super_hacker']);
     expect(
-      await screen.findByRole('heading', { name: /Role scope restriction/i }),
+      await screen.findByRole('heading', { name: /Access restricted/i }),
     ).toBeInTheDocument();
   });
 

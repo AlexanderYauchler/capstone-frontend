@@ -1,14 +1,15 @@
 /* eslint-disable react-refresh/only-export-components */
 import { Link, useLocation, useNavigate } from 'react-router';
 import {
-  Activity,
   ArrowRight,
   BarChart3,
   CalendarRange,
   ClipboardList,
+  FileCheck2,
   FileText,
   History,
   LayoutDashboard,
+  Mic,
   Plus,
   Settings,
   ShieldCheck,
@@ -23,15 +24,25 @@ export interface NavItemConfig {
   readonly label: string;
   readonly to: string;
   readonly matchPath: string;
+  readonly extraMatchPaths?: readonly string[];
   readonly matchQuery?: { readonly key: string; readonly value: string };
   readonly icon: ReactNode;
+  /** Rendered as the prominent green call-to-action button on desktop. */
+  readonly isPrimaryAction?: boolean;
 }
 
 export const ROLE_WORKSPACE_LABELS: Record<UserRole, string> = {
   clinician: 'Clinician Workspace',
-  patient: 'Patients & Visitors',
+  patient: 'Patient Portal',
   analyst: 'Healthcare Analytics',
-  admin: 'Clinical Governance',
+  admin: 'Administration',
+};
+
+export const ROLE_HOME_ROUTES: Record<UserRole, string> = {
+  clinician: '/clinician/dashboard',
+  patient: '/patient',
+  analyst: '/analyst/analytics?view=cohort',
+  admin: '/admin?tab=overview',
 };
 
 export const ROLE_NAV_ITEMS: Record<UserRole, readonly NavItemConfig[]> = {
@@ -49,24 +60,30 @@ export const ROLE_NAV_ITEMS: Record<UserRole, readonly NavItemConfig[]> = {
       icon: <ClipboardList className="w-4 h-4" aria-hidden="true" />,
     },
     {
+      label: 'Reports & review',
+      to: '/clinician/reviews',
+      matchPath: '/clinician/reviews',
+      icon: <FileCheck2 className="w-4 h-4" aria-hidden="true" />,
+    },
+    {
       label: 'Analytics',
       to: '/clinician/analytics?view=cohort',
       matchPath: '/clinician/analytics',
-      matchQuery: { key: 'view', value: 'cohort' },
       icon: <BarChart3 className="w-4 h-4" aria-hidden="true" />,
-    },
-    {
-      label: 'Monthly analytics',
-      to: '/clinician/analytics?view=monthly',
-      matchPath: '/clinician/analytics',
-      matchQuery: { key: 'view', value: 'monthly' },
-      icon: <CalendarRange className="w-4 h-4" aria-hidden="true" />,
     },
     {
       label: 'Settings',
       to: '/settings',
       matchPath: '/settings',
       icon: <Settings className="w-4 h-4" aria-hidden="true" />,
+    },
+    {
+      label: 'New recording',
+      to: '/clinician/sessions/new',
+      matchPath: '/clinician/sessions/new',
+      extraMatchPaths: ['/clinician/sessions/upload'],
+      icon: <Mic className="w-4 h-4" aria-hidden="true" />,
+      isPrimaryAction: true,
     },
   ],
   patient: [
@@ -83,7 +100,7 @@ export const ROLE_NAV_ITEMS: Record<UserRole, readonly NavItemConfig[]> = {
       icon: <FileText className="w-4 h-4" aria-hidden="true" />,
     },
     {
-      label: 'Report history',
+      label: 'Visit history',
       to: '/patient/history',
       matchPath: '/patient/history',
       icon: <History className="w-4 h-4" aria-hidden="true" />,
@@ -91,30 +108,23 @@ export const ROLE_NAV_ITEMS: Record<UserRole, readonly NavItemConfig[]> = {
   ],
   analyst: [
     {
-      label: 'Analytics',
+      label: 'Population overview',
       to: '/analyst/analytics?view=cohort',
       matchPath: '/analyst/analytics',
       matchQuery: { key: 'view', value: 'cohort' },
       icon: <BarChart3 className="w-4 h-4" aria-hidden="true" />,
     },
     {
-      label: 'Monthly analytics',
+      label: 'Monthly operations',
       to: '/analyst/analytics?view=monthly',
       matchPath: '/analyst/analytics',
       matchQuery: { key: 'view', value: 'monthly' },
       icon: <CalendarRange className="w-4 h-4" aria-hidden="true" />,
     },
-    {
-      label: 'Saved views',
-      to: '/analyst/analytics?view=cohort&preset=diabetes-sept',
-      matchPath: '/analyst/analytics',
-      matchQuery: { key: 'preset', value: 'diabetes-sept' },
-      icon: <Activity className="w-4 h-4" aria-hidden="true" />,
-    },
   ],
   admin: [
     {
-      label: 'Workspace',
+      label: 'Overview',
       to: '/admin?tab=overview',
       matchPath: '/admin',
       matchQuery: { key: 'tab', value: 'overview' },
@@ -143,27 +153,37 @@ export const ROLE_NAV_ITEMS: Record<UserRole, readonly NavItemConfig[]> = {
   ],
 };
 
+/** Returns a match score for one item, or -1 when it does not match the location. */
+function scoreNavItem(item: NavItemConfig, pathname: string, searchParams: URLSearchParams): number {
+  const paths = [item.matchPath, ...(item.extraMatchPaths ?? [])];
+  const matchedPath = paths.find((p) =>
+    p === '/patient' ? pathname === '/patient' : pathname === p || pathname.startsWith(`${p}/`),
+  );
+  if (!matchedPath) return -1;
+  if (!item.matchQuery) return matchedPath.length * 10;
+
+  const actualVal = searchParams.get(item.matchQuery.key);
+  const isDefaultValue =
+    (item.matchQuery.key === 'view' && item.matchQuery.value === 'cohort') ||
+    (item.matchQuery.key === 'tab' && item.matchQuery.value === 'overview');
+  const queryMatches = actualVal === item.matchQuery.value || (isDefaultValue && actualVal === null);
+  return queryMatches ? matchedPath.length * 10 + 5 : -1;
+}
+
+/**
+ * True when this item is the single best match for the current location, so exactly
+ * one navigation item is marked active (e.g. "New recording" rather than "Clinical sessions").
+ */
 export function isNavItemActive(
   item: NavItemConfig,
   pathname: string,
   searchParams: URLSearchParams,
 ): boolean {
-  const pathMatches =
-    item.matchPath === '/patient'
-      ? pathname === '/patient'
-      : pathname === item.matchPath || pathname.startsWith(`${item.matchPath}/`);
-
-  if (!pathMatches) return false;
-  if (!item.matchQuery) return true;
-
-  const actualVal = searchParams.get(item.matchQuery.key);
-  if (item.matchQuery.key === 'view' && item.matchQuery.value === 'cohort') {
-    return (actualVal === null || actualVal === 'cohort') && !searchParams.get('preset');
-  }
-  if (item.matchQuery.key === 'tab' && item.matchQuery.value === 'overview') {
-    return actualVal === null || actualVal === 'overview';
-  }
-  return actualVal === item.matchQuery.value;
+  const siblings =
+    Object.values(ROLE_NAV_ITEMS).find((list) => list.includes(item)) ?? [item];
+  const own = scoreNavItem(item, pathname, searchParams);
+  if (own < 0) return false;
+  return siblings.every((other) => other === item || scoreNavItem(other, pathname, searchParams) <= own);
 }
 
 /**
@@ -371,7 +391,7 @@ export function Sidebar({
         {/* Quick Persona Switcher inside Mobile Drawer */}
         <div className="mt-6 pt-5 border-t border-[#d5e0db]">
           <p className="text-xs font-bold uppercase tracking-wider text-[#0d4026] mb-3">
-            Quick Role Switcher
+            Switch demo role
           </p>
           <div className="grid grid-cols-2 gap-2">
             {demoUsers.map((user) => {
@@ -383,15 +403,7 @@ export function Sidebar({
                   onClick={async () => {
                     await switchDemoRole(user.role);
                     onNavigate?.();
-                    const defaultDest =
-                      user.role === 'clinician'
-                        ? '/clinician/dashboard'
-                        : user.role === 'patient'
-                          ? '/patient'
-                          : user.role === 'analyst'
-                            ? '/analyst/analytics?view=cohort'
-                            : '/admin?tab=overview';
-                    void navigate(defaultDest);
+                    void navigate(ROLE_HOME_ROUTES[user.role]);
                   }}
                   className={[
                     'text-left px-3 py-2 rounded-[8px] border text-xs font-semibold transition-colors cursor-pointer',
@@ -422,7 +434,7 @@ export function Sidebar({
             void navigate('/login');
           }}
         >
-          Switch account / Role Hub
+          Back to role selection
         </Button>
       </div>
     </div>

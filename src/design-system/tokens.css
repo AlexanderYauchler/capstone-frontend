@@ -102,3 +102,48 @@ h3,
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Chart tokens (validated: categorical pair passes CVD + contrast checks on white) */
+:root {
+  --chart-series-1: #00783c;
+  --chart-series-2: #8a4fc9;
+  --chart-grid: #e4ece7;
+  --chart-axis: #9fb3a8;
+  --chart-highlight: rgba(0, 120, 60, 0.08);
+}
+
+/* Visible keyboard focus everywhere (WCAG 2.4.7 / 2.4.11) */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  [data-print-hide] {
+    display: none !important;
+  }
+}
