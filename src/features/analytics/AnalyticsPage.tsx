@@ -703,11 +703,13 @@ function MonthlyView({
 
       <LineChart
         title="Monthly trend"
-        description="Clinical sessions and completed reports per month for the current filters. The selected month is shaded."
-        categories={data.monthlyTrend.map((p) => p.shortLabel)}
+        description={`Clinical sessions and reports still awaiting review, per month, for the current filters. The selected month is shaded. ${formatMonthLabel(REFERENCE_DATE.slice(0, 7)).split(' ')[0]} is in progress (through ${formatYmd(REFERENCE_DATE)}).`}
+        categories={data.monthlyTrend.map((p) =>
+          p.monthKey === REFERENCE_DATE.slice(0, 7) ? `${p.shortLabel} (to date)` : p.shortLabel,
+        )}
         series={[
           { name: 'Clinical sessions', color: 'var(--chart-series-1)', values: data.monthlyTrend.map((p) => p.totalSessions) },
-          { name: 'Completed reports', color: 'var(--chart-series-2)', values: data.monthlyTrend.map((p) => p.completedReports) },
+          { name: 'Awaiting review', color: 'var(--chart-series-2)', values: data.monthlyTrend.map((p) => p.awaitingReview) },
         ]}
         yAxisLabel="Count"
         xAxisLabel={`Month (${data.monthlyTrend[0]?.monthKey.slice(0, 4) ?? ''})`}

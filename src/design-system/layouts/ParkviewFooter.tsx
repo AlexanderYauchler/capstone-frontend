@@ -1,16 +1,9 @@
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { useAuth } from '../../app/providers/AuthProvider';
-import type { UserRole } from '../../domain/models';
-import { CoSignBrandLockup } from './Sidebar';
+import { CoSignBrandLockup, ROLE_NAV_ITEMS, ROLE_WORKSPACE_LABELS } from './Sidebar';
 
 export function ParkviewFooter() {
-  const { switchDemoRole } = useAuth();
-  const navigate = useNavigate();
-
-  const handleRoleNav = async (role: UserRole, to: string) => {
-    await switchDemoRole(role);
-    void navigate(to);
-  };
+  const { currentUser } = useAuth();
 
   return (
     <footer className="bg-[#1b8449] text-white mt-16 border-t-4 border-[#02754b]">
@@ -29,138 +22,34 @@ export function ParkviewFooter() {
             </p>
           </div>
 
-          {/* Column 2: Clinician Care */}
-          <div>
+          {/* Column 2: Pages available to the current role only */}
+          <nav aria-label="Footer" className="lg:col-span-2">
             <h2 className="text-sm font-bold uppercase tracking-wider text-white mb-4 font-display">
-              Clinician Workspace
+              {ROLE_WORKSPACE_LABELS[currentUser.role]}
             </h2>
-            <ul className="space-y-2.5 text-sm text-white/90">
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('clinician', '/clinician/dashboard')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Clinician Command Center
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('clinician', '/clinician/sessions')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Clinical Sessions Directory
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('clinician', '/clinician/sessions/new')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  New Visit Setup (Sequence 4)
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('clinician', '/clinician/sessions/CS-1042')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Review Visit CS-1042
-                </button>
-              </li>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm text-white/90">
+              {ROLE_NAV_ITEMS[currentUser.role].map((item) => (
+                <li key={item.to}>
+                  <Link to={item.to} className="hover:underline underline-offset-4">
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
-          </div>
+          </nav>
 
-          {/* Column 3: Patients & Visitors */}
+          {/* Column 3: Demo controls */}
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider text-white mb-4 font-display">
-              Patients &amp; Visitors
+              Demonstration
             </h2>
             <ul className="space-y-2.5 text-sm text-white/90">
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('patient', '/patient')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Patient Care Overview
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('patient', '/patient/reports')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Released Medical Reports
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('patient', '/patient/history')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Care Timeline &amp; History
-                </button>
-              </li>
               <li>
                 <Link to="/login" className="hover:underline underline-offset-4">
-                  Switch Demo Persona
+                  Switch demo role
                 </Link>
               </li>
-            </ul>
-          </div>
-
-          {/* Column 4: Analytics & Governance */}
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-white mb-4 font-display">
-              Analytics &amp; Governance
-            </h2>
-            <ul className="space-y-2.5 text-sm text-white/90">
-              <li>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void handleRoleNav('analyst', '/analyst/analytics?view=cohort')
-                  }
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Aggregate Clinical Cohorts
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void handleRoleNav('clinician', '/clinician/analytics?view=monthly')
-                  }
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Monthly Documentation Ops
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('admin', '/admin?tab=overview')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Role Access &amp; Governance
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => void handleRoleNav('admin', '/admin?tab=audit')}
-                  className="hover:underline underline-offset-4 cursor-pointer text-left"
-                >
-                  Activity Audit Log
-                </button>
-              </li>
+              <li>Signed in as {currentUser.displayName}</li>
             </ul>
           </div>
         </div>

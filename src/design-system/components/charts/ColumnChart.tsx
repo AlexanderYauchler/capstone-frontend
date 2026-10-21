@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ChartFrame, niceAxisMax } from './chart-utils';
+import { ChartFrame, axisTicks, niceAxisMax } from './chart-utils';
 
 export interface ColumnDatum {
   readonly label: string;
@@ -44,7 +44,7 @@ export function ColumnChart({
   const maxValue = niceAxisMax(Math.max(0, ...data.map((d) => d.value ?? 0)));
   const band = data.length > 0 ? plotWidth / data.length : plotWidth;
   const barWidth = Math.min(24, band * 0.6);
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxValue * f));
+  const ticks = axisTicks(maxValue);
   const labelEvery = Math.max(1, Math.ceil(data.length / 12));
   const hovered = hoverIndex !== null ? data[hoverIndex] : undefined;
 

@@ -31,7 +31,7 @@ export function PatientReportDetailPage() {
   const { reportId = '' } = useParams<{ reportId: string }>();
   const services = useServices();
   const { currentUser } = useAuth();
-  const patientId = currentUser.linkedPatientId ?? 'pat-alex-morgan';
+  const patientId = currentUser.linkedPatientId ?? '';
 
   const {
     data: detail,

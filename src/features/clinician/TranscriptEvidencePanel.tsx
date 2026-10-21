@@ -140,8 +140,8 @@ export function TranscriptEvidencePanel({
         <span className="inline-flex items-center gap-1.5">
           <VolumeX className="w-3.5 h-3.5 text-[#00783c] shrink-0" aria-hidden="true" />
           <span>
-            Timestamp navigation and provenance highlighting are active. Audio playback belongs to
-            Sequence 4 recording integration.
+            Select a timestamp to see which part of the report it supports. Audio playback is not
+            available in this demo.
           </span>
         </span>
       </div>

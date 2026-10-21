@@ -13,6 +13,13 @@ export function niceAxisMax(value: number): number {
   return 10 * base;
 }
 
+/** Evenly spaced, whole-number ticks from 0 to a value returned by niceAxisMax. */
+export function axisTicks(max: number): number[] {
+  const leading = max / 10 ** Math.floor(Math.log10(max));
+  const divisions = leading === 2 ? 4 : 5;
+  return Array.from({ length: divisions + 1 }, (_, i) => Math.round((max / divisions) * i * 100) / 100);
+}
+
 export interface ChartFrameProps {
   readonly titleId: string;
   readonly title: string;

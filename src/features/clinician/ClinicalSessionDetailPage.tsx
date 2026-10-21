@@ -688,7 +688,7 @@ export function ClinicalSessionDetailPage() {
             </p>
           </div>
 
-          {/* Persistent Save Draft Controls + Sequence 3B Boundary Notice */}
+          {/* Persistent Save Draft Controls */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             {canEdit && report ? (
               <>
@@ -990,7 +990,7 @@ export function ClinicalSessionDetailPage() {
               : 'Not yet shared'}
           </p>
           <p className="text-[11px] text-[#495057]">
-            {session.release.releasedByDisplayName ?? 'Scheduled for Sequence 3C'}
+            {session.release.releasedByDisplayName ?? 'Released after approval'}
           </p>
         </Card>
 

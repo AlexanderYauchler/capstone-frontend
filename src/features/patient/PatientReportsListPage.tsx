@@ -32,7 +32,8 @@ export interface PatientReportsListPageProps {
 export function PatientReportsListPage({ mode = 'reports' }: PatientReportsListPageProps) {
   const services = useServices();
   const { currentUser } = useAuth();
-  const patientId = currentUser.linkedPatientId ?? 'pat-alex-morgan';
+  // No fallback patient: a profile without a linked record sees an error, never another patient’s data.
+  const patientId = currentUser.linkedPatientId ?? '';
 
   const {
     data: releasedItems,

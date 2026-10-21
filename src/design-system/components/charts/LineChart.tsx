@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ChartFrame, niceAxisMax } from './chart-utils';
+import { ChartFrame, axisTicks, niceAxisMax } from './chart-utils';
 
 export interface LineSeries {
   readonly name: string;
@@ -45,7 +45,7 @@ export function LineChart({
   const step = categories.length > 1 ? plotWidth / (categories.length - 1) : plotWidth;
   const xAt = (i: number) => MARGIN.left + (categories.length > 1 ? step * i : plotWidth / 2);
   const yAt = (v: number) => MARGIN.top + plotHeight - (v / maxValue) * plotHeight;
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxValue * f));
+  const ticks = axisTicks(maxValue);
 
   const legend = (
     <ul className="flex flex-wrap items-center gap-4 text-xs text-[#242628]" aria-label="Legend">
