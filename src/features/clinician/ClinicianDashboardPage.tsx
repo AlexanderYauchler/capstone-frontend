@@ -196,7 +196,7 @@ export function ClinicianDashboardPage() {
               size="md"
               iconLeft={<Mic className="w-4 h-4 text-[#00783c]" aria-hidden="true" />}
             >
-              Start a clinical visit
+              New recording
             </ButtonLink>
           </div>
         </div>

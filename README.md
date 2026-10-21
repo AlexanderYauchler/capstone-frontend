@@ -36,5 +36,9 @@ npm run build
 
 ## 3. Architecture & Documentation
 
+- [Frontend architecture](docs/frontend-architecture.md)
+- [Demo walkthrough](docs/demo-walkthrough.md)
+- [Implementation status](docs/implementation-status.md)
+- [Parkview UX benchmark](docs/parkview-benchmark.md)
 - [Architecture & Implementation Plan](docs/cosign_architecture_plan.md)
 - [Verified 62-Frame Figma Prototype Inventory](docs/figma_inventory.md)

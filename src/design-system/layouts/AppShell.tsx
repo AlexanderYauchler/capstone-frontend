@@ -15,6 +15,13 @@ export function AppShell({ variant = 'workspace', children }: AppShellProps) {
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden flex flex-col bg-white text-[#242628]">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:text-[#0d4026] focus:font-bold focus:px-4 focus:py-2 focus:rounded-[8px] focus:shadow-md"
+      >
+        Skip to main content
+      </a>
+
       {/* Tier 0: Parkview Pale-Mint System Notice Strip */}
       <DemoSimulationBar />
 
@@ -44,7 +51,7 @@ export function AppShell({ variant = 'workspace', children }: AppShellProps) {
       </Drawer>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full">
+      <main id="main-content" tabIndex={-1} className="flex-1 w-full focus:outline-none">
         {variant === 'login' ? (
           children
         ) : (
