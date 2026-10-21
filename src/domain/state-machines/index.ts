@@ -418,17 +418,16 @@ export function transitionResolveClarifications(params: {
   const remainingUnresolved = updatedClarifications.filter((q) => cIsUnresolved(q)).length;
   const nextRevisionNumber = report.currentRevision + 1;
 
-  const isDefaultUnclarifiedPlan =
-    report.soap.plan ===
-    'Medication strength and allergy status require clarification. HbA1c and metabolic panel ordered; follow-up in two weeks.';
+  // Apply exactly what the clinician typed; never substitute canned clinical text.
+  const newlyConfirmedDetails = updatedClarifications
+    .filter((q) => answerMap.has(q.id))
+    .map((q) => answerMap.get(q.id)!.replace(/[.\s]+$/, ''));
 
   const updatedSoap: SoapSections = {
     ...report.soap,
     plan:
       updatedPlanText ??
-      (remainingUnresolved === 0 && isDefaultUnclarifiedPlan
-        ? 'Metformin strength confirmed as 1,000 mg twice daily. No known drug allergies confirmed by clinician. HbA1c and metabolic panel ordered; follow-up in two weeks.'
-        : report.soap.plan),
+      `${report.soap.plan.trim()}\nClinician-confirmed: ${newlyConfirmedDetails.join('; ')}.`,
   };
 
   const newRevision: ReportRevision = {

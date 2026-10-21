@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useServices } from '../../app/providers/ServiceProvider';
+import { invalidateWorkspaceQueries } from '../../app/query-keys';
 import { Button, ButtonLink } from '../../design-system/components/Button';
 import { Card } from '../../design-system/components/Card';
 import { Dialog } from '../../design-system/components/Dialog';
@@ -255,9 +256,7 @@ export function ClinicalSessionDetailPage() {
 
         queryClient.setQueryData(['session-review-bundle', session.id], updatedBundle);
         setDraftSoapOverrides({});
-        await queryClient.invalidateQueries({ queryKey: ['sessions'] });
-        await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-        await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+        await invalidateWorkspaceQueries(queryClient);
 
         setSaveFeedback({
           tone: 'success',
@@ -273,9 +272,7 @@ export function ClinicalSessionDetailPage() {
           ...bundle,
           session: updatedSession,
         });
-        await queryClient.invalidateQueries({ queryKey: ['sessions'] });
-        await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-        await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+        await invalidateWorkspaceQueries(queryClient);
 
         setSaveFeedback({
           tone: 'success',
@@ -308,9 +305,7 @@ export function ClinicalSessionDetailPage() {
         answers,
       });
       queryClient.setQueryData(['session-review-bundle', session.id], updatedBundle);
-      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-      await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+      await invalidateWorkspaceQueries(queryClient);
     } finally {
       setIsMutating(false);
     }
@@ -327,9 +322,7 @@ export function ClinicalSessionDetailPage() {
         questionId,
       });
       queryClient.setQueryData(['session-review-bundle', session.id], updatedBundle);
-      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-      await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+      await invalidateWorkspaceQueries(queryClient);
     } finally {
       setIsMutating(false);
     }
@@ -345,9 +338,7 @@ export function ClinicalSessionDetailPage() {
         expectedRevision: report.currentRevision,
       });
       queryClient.setQueryData(['session-review-bundle', session.id], updatedBundle);
-      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-      await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+      await invalidateWorkspaceQueries(queryClient);
     } finally {
       setIsMutating(false);
     }
@@ -363,10 +354,7 @@ export function ClinicalSessionDetailPage() {
         expectedRevision: report.currentRevision,
       });
       queryClient.setQueryData(['session-review-bundle', session.id], updatedBundle);
-      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-      await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
-      await queryClient.invalidateQueries({ queryKey: ['patient-released-reports'] });
+      await invalidateWorkspaceQueries(queryClient);
     } finally {
       setIsMutating(false);
     }

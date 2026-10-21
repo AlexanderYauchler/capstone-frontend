@@ -41,6 +41,7 @@ import type {
   UploadAudioFileInput,
 } from '../contracts';
 import { DEMO_USERS } from './fixtures';
+import { buildSimulatedVisitDraft } from './fixtures/simulated-draft';
 import type { DemoStore } from './demo-store';
 import { transientMediaRegistry } from './transient-media-registry';
 
@@ -108,6 +109,27 @@ const SUPPORTED_UPLOAD_MIME_TYPES = new Set([
 const SUPPORTED_UPLOAD_EXTENSIONS = /\.(wav|mp3|m4a|mp4|aac|webm|ogg|flac)$/i;
 
 export const MAX_AUDIO_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+function formatReferenceDateLabel(ymd: string): string {
+  const [, month, day] = ymd.split('-');
+  const monthName = MONTH_NAMES[Number(month) - 1] ?? ymd;
+  return `${monthName} ${Number(day)}`;
+}
 
 function formatDurationLabel(durationSeconds: number): string {
   const safeSecs = Math.max(0, Math.round(durationSeconds));
@@ -207,7 +229,7 @@ export function createDemoServices(store: DemoStore): ICoSignServices {
 
         return {
           referenceDate: refDate,
-          referenceDateLabel: 'October 6',
+          referenceDateLabel: formatReferenceDateLabel(refDate),
           todaysSessionsCount: todaysSessions.length,
           needsReviewCount,
           clarificationNeededSessionsCount: clarificationSessions.length,
@@ -811,6 +833,12 @@ export function createDemoServices(store: DemoStore): ICoSignServices {
                   errorCode: undefined,
                   errorMessage: undefined,
                 },
+                // A discarded recording also clears any interrupted processing job,
+                // so the visit can be captured again from a clean state.
+                processing:
+                  s.review.status === 'not_generated'
+                    ? { status: 'idle', retryCount: 0, maxRetries: 2, stages: [] }
+                    : s.processing,
               };
               updatedSession = nextSession;
               return nextSession;
@@ -898,6 +926,14 @@ export function createDemoServices(store: DemoStore): ICoSignServices {
 
       async retryProcessingPipeline(sessionId: string): Promise<ClinicalSession> {
         const nowIso = defaultClinicClock.nowIso();
+        const target = store.getState().sessions.find((s) => s.id === sessionId);
+        if (!target) throw new Error(`Session ${sessionId} not found.`);
+        if (target.processing.retryCount >= target.processing.maxRetries) {
+          throw new DomainTransitionError(
+            'INVALID_LIFECYCLE_TRANSITION',
+            `Retry limit reached (${target.processing.maxRetries} attempts). Discard the recording and capture the visit again.`,
+          );
+        }
         let updatedSession: ClinicalSession | undefined;
         store.update((prev) => ({
           ...prev,
@@ -910,6 +946,7 @@ export function createDemoServices(store: DemoStore): ICoSignServices {
                 ...s.processing,
                 status: 'running',
                 failedStage: undefined,
+                retryCount: s.processing.retryCount + 1,
                 startedAt: nowIso,
                 stages: s.processing.stages.map((stage) =>
                   stage.status === 'failed'
@@ -929,8 +966,16 @@ export function createDemoServices(store: DemoStore): ICoSignServices {
       async completeProcessingPipelineDemo(sessionId: string): Promise<SessionReviewBundle> {
         const nowIso = defaultClinicClock.nowIso();
         const state = store.getState();
-        const existingReport = state.reports[sessionId] ?? state.reports['CS-1042']!;
-        const existingTranscript = state.transcripts[sessionId] ?? state.transcripts['CS-1042']!;
+        const targetSession = state.sessions.find((s) => s.id === sessionId);
+        if (!targetSession) throw new Error(`Session ${sessionId} not found.`);
+        // Seeded sessions keep their canonical drafts; new visits get a simulated draft
+        // built for their own patient (never another patient's report).
+        const simulated =
+          state.reports[sessionId] && state.transcripts[sessionId]
+            ? null
+            : buildSimulatedVisitDraft(targetSession, nowIso);
+        const existingReport = state.reports[sessionId] ?? simulated!.report;
+        const existingTranscript = state.transcripts[sessionId] ?? simulated!.transcript;
         let updatedSession: ClinicalSession | undefined;
 
         store.update((prev) => ({

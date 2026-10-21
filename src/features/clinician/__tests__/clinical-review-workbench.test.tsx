@@ -183,9 +183,13 @@ describe('CoSign Sequence 3B — Functional Clinical Review Workbench', () => {
     firstRender.unmount();
     renderWorkbench(['/clinician/sessions/CS-1042']);
     expect(await screen.findByText(/All 2 Resolved/i)).toBeInTheDocument();
+    // The saved answer shows on the clarification card and is applied to the Plan section.
     expect(
-      screen.getByText(/Metformin 1,000 mg twice daily confirmed in EHR\./i),
-    ).toBeInTheDocument();
+      screen.getAllByText(/Metformin 1,000 mg twice daily confirmed in EHR\./i).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      (screen.getByLabelText(/Plan/i, { selector: 'textarea' }) as HTMLTextAreaElement).value,
+    ).toContain('Clinician-confirmed: Metformin 1,000 mg twice daily confirmed in EHR');
 
     // 6. Reopen Question 1 -> status returns to Clarification needed (1 Unresolved · 1 Resolved)
     const reopenButtons = screen.getAllByRole('button', { name: /Reopen Question/i });

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useServiceContext, useServices } from '../../app/providers/ServiceProvider';
+import { invalidateWorkspaceQueries } from '../../app/query-keys';
 import { Button, ButtonLink } from '../../design-system/components/Button';
 import { Card } from '../../design-system/components/Card';
 import { Dialog } from '../../design-system/components/Dialog';
@@ -430,9 +431,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
           );
         }
         const updated = await services.sessions.confirmPatientConsent(activeSession.id);
-        await queryClient.invalidateQueries({ queryKey: ['session-review-bundle', updated.id] });
-        await queryClient.invalidateQueries({ queryKey: ['clinician-dashboard-sessions'] });
-        await queryClient.invalidateQueries({ queryKey: ['clinical-sessions-list'] });
+        await invalidateWorkspaceQueries(queryClient);
         return updated;
       }
       return activeSession;
@@ -458,11 +457,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
         primarySymptom,
       });
       setActiveSessionId(created.id);
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-      await queryClient.invalidateQueries({ queryKey: ['clinician-dashboard-sessions'] });
-      await queryClient.invalidateQueries({ queryKey: ['clinical-sessions-list'] });
-      await queryClient.invalidateQueries({ queryKey: ['clinical-sessions-unfiltered-total'] });
-      await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+      await invalidateWorkspaceQueries(queryClient);
       return created;
     } finally {
       setIsInitializingSession(false);
@@ -829,9 +824,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
         await services.capture.discardRecording(activeSessionId);
         setSubmittedRecording(null);
         await refetchBundle();
-        await queryClient.invalidateQueries({ queryKey: ['clinician-dashboard-sessions'] });
-        await queryClient.invalidateQueries({ queryKey: ['clinical-sessions-list'] });
-        await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+        await invalidateWorkspaceQueries(queryClient);
       } catch (err) {
         setStudioStage('failed');
         setErrorDetails({
@@ -876,10 +869,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
       setSubmittedRecording(recording);
       setStudioStage('submitted');
       await refetchBundle();
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-      await queryClient.invalidateQueries({ queryKey: ['clinician-dashboard-sessions'] });
-      await queryClient.invalidateQueries({ queryKey: ['clinical-sessions-list'] });
-      await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+      await invalidateWorkspaceQueries(queryClient);
     } catch (err) {
       setStudioStage('failed');
       setErrorDetails({
@@ -970,10 +960,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
       setSubmittedRecording(recording);
       setStudioStage('submitted');
       await refetchBundle();
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-      await queryClient.invalidateQueries({ queryKey: ['clinician-dashboard-sessions'] });
-      await queryClient.invalidateQueries({ queryKey: ['clinical-sessions-list'] });
-      await queryClient.invalidateQueries({ queryKey: ['audit-events'] });
+      await invalidateWorkspaceQueries(queryClient);
     } catch (err) {
       setStudioStage('failed');
       setErrorDetails({
