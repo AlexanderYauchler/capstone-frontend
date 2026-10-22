@@ -61,6 +61,7 @@ import {
   formatEncounterDateDisplay,
   formatTimeShort,
 } from './session-formatters';
+import { ClinicianWorkflowProgress } from './ClinicianWorkflowProgress';
 
 export type StudioCaptureMode = 'microphone' | 'upload';
 
@@ -177,6 +178,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isStartingDraft, setIsStartingDraft] = useState<boolean>(false);
+  const [workflowStage, setWorkflowStage] = useState<1 | 2>(1);
 
   // Active Encounter State
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
@@ -267,6 +269,9 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
     setPrimarySymptom(activeSession.primarySymptom);
     setTemplateId(activeSession.templateId);
     setConsentChecked(activeSession.capture.consentConfirmed);
+    if (activeSession.capture.consentConfirmed) {
+      setWorkflowStage(2);
+    }
 
     if (
       (activeSession.capture.status === 'recording_ready' ||
@@ -486,6 +491,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
 
     try {
       await ensureConsentedSession();
+      setWorkflowStage(2);
       if (studioStage === 'failed') {
         setStudioStage('ready');
       }
@@ -1074,6 +1080,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
     setConsentChecked(false);
     setErrorDetails(null);
     setStudioStage('ready');
+    setWorkflowStage(1);
   };
 
   const currentStageMeta = STUDIO_STAGE_METADATA[studioStage];
@@ -1188,22 +1195,13 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
               Record a clinical visit
             </h1>
             <p className="text-xs sm:text-sm text-white/95 leading-relaxed">
-              1. Choose the patient and visit. 2. Confirm recording consent. 3. Record with your
-              microphone (or attach a file), listen back, and save it to the visit.
+              {workflowStage === 1
+                ? 'Confirm the patient, visit reason, and recording consent before any audio capture begins.'
+                : 'Capture the consultation, listen back, and save the recording before generating the report.'}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {activeSession && (
-              <ButtonLink
-                to={`/clinician/sessions/${activeSession.id}`}
-                variant="heroDark"
-                size="sm"
-                iconRight={<ArrowRight className="w-4 h-4 text-[#7dc242]" aria-hidden="true" />}
-              >
-                Open Encounter {activeSession.id}
-              </ButtonLink>
-            )}
             <ButtonLink
               to="/clinician/sessions"
               variant="secondary"
@@ -1216,6 +1214,11 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
         </div>
       </section>
 
+      <ClinicianWorkflowProgress
+        currentStage={workflowStage}
+        completedThrough={workflowStage === 2 ? 1 : 0}
+      />
+
       {/* Authoritative 9-State Studio Status Tracker Bar */}
       <Card
         tone={
@@ -1227,7 +1230,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
         }
         padding="md"
         aria-label="Recording studio lifecycle status"
-        className={`space-y-3 border-l-4 ${
+        className={`hidden space-y-3 border-l-4 ${
           studioStage === 'failed'
             ? 'border-l-[var(--color-danger)]'
             : studioStage === 'recording'
@@ -1378,19 +1381,19 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
         </Card>
       )}
 
-      {/* Main Studio Two-Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* One workflow stage is shown at a time. */}
+      <div className="grid grid-cols-1 gap-6 items-start">
         {/* Left Column (5 cols): Step 1 (Encounter Setup) + Step 2 (Consent & Privacy Gate) */}
-        <div className="min-w-0 lg:col-span-5 space-y-6">
+        <div className={`min-w-0 w-full max-w-3xl mx-auto space-y-6 ${workflowStage === 1 ? 'block' : 'hidden'}`}>
           {/* Step 1: Encounter Setup & Patient Confirmation */}
           <Card padding="md" className="space-y-4">
             <div className="flex items-center justify-between border-b border-[#e4ece7] pb-3">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#00783c]">
-                  Step 1 of 3
+                  Stage 1 of 4
                 </span>
                 <h2 className="text-lg font-bold text-[#0d4026] font-display">
-                  Patient and visit
+                  Patient &amp; Consent
                 </h2>
               </div>
               {activeSession ? (
@@ -1425,8 +1428,8 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
               </div>
 
               {/* Department & Visit Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
+              <div className="hidden grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="hidden space-y-1">
                   <label
                     htmlFor="capture-department-select"
                     className="block text-xs font-bold uppercase tracking-wider text-[#0d4026]"
@@ -1492,7 +1495,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                 </datalist>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1">
                   <label
                     htmlFor="capture-diagnosis-select"
@@ -1517,7 +1520,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
                   </select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="hidden space-y-1">
                   <label
                     htmlFor="capture-symptom-select"
                     className="block text-xs font-bold uppercase tracking-wider text-[#0d4026]"
@@ -1581,7 +1584,7 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
             <div className="flex items-center justify-between gap-2">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#00783c]">
-                  Step 2 of 3 · Required Before Capture
+                  Required before recording
                 </span>
                 <h2 className="text-lg font-bold text-[#0d4026] font-display">
                   Recording consent
@@ -1620,20 +1623,17 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
             </label>
 
             {!activeSession && (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-[#495057]">
-                  You can initialize the encounter record now or when you start capture.
-                </span>
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
-                  variant="secondary"
-                  size="sm"
+                  variant="primary"
+                  size="md"
                   disabled={!consentChecked || isInitializingSession}
-                  iconLeft={<CheckCircle2 className="w-4 h-4 text-[#00783c]" aria-hidden="true" />}
+                  iconRight={<ArrowRight className="w-4 h-4" aria-hidden="true" />}
                   onClick={() => void handleConfirmEncounterAndConsent()}
                 >
                   {isInitializingSession
-                    ? 'Initializing…'
-                    : 'Confirm Consent & Initialize Encounter'}
+                    ? 'Preparing visit…'
+                    : 'Continue to recording'}
                 </Button>
               </div>
             )}
@@ -1665,18 +1665,32 @@ export function ClinicalVisitCapturePage({ defaultMode }: ClinicalVisitCapturePa
         </div>
 
         {/* Right Column (7 cols): Step 3 (Live Microphone Capture & Audio File Upload Workbench) */}
-        <div className="min-w-0 lg:col-span-7 space-y-6">
+        <div className={`min-w-0 w-full max-w-4xl mx-auto space-y-6 ${workflowStage === 2 ? 'block' : 'hidden'}`}>
           <Card padding="md" className="space-y-5">
             {/* Mode Switcher Tabs: Live Microphone vs. File Upload */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e4ece7] pb-3.5">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#00783c]">
-                  Step 3 of 3
+                  Stage 2 of 4
                 </span>
                 <h2 className="text-lg sm:text-xl font-bold text-[#0d4026] font-display">
-                  Record the visit
+                  Record Consultation
                 </h2>
               </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={
+                  studioStage === 'recording' ||
+                  studioStage === 'paused' ||
+                  studioStage === 'uploading'
+                }
+                iconLeft={<ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />}
+                onClick={() => setWorkflowStage(1)}
+              >
+                Patient &amp; consent
+              </Button>
 
               <div
                 role="tablist"

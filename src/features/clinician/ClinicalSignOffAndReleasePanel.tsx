@@ -40,6 +40,7 @@ export interface ClinicalSignOffAndReleasePanelProps {
   readonly hasUnsavedClarificationDrafts: boolean;
   readonly isMutating: boolean;
   readonly sessionAuditEvents: readonly AuditEvent[];
+  readonly openApprovalOnMount?: boolean;
   readonly onApproveAndFinalize: () => Promise<void>;
   readonly onReleaseToPatient: () => Promise<void>;
 }
@@ -75,10 +76,11 @@ export function ClinicalSignOffAndReleasePanel({
   hasUnsavedClarificationDrafts,
   isMutating,
   sessionAuditEvents,
+  openApprovalOnMount = false,
   onApproveAndFinalize,
   onReleaseToPatient,
 }: ClinicalSignOffAndReleasePanelProps) {
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(openApprovalOnMount);
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{
     readonly tone: 'success' | 'error';

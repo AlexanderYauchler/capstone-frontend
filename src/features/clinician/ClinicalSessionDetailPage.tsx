@@ -28,6 +28,7 @@ import { StepProgress } from '../../design-system/components/StepProgress';
 import { ROLE_WORKSPACE_LABELS } from '../../design-system/layouts/Sidebar';
 import type { SoapSectionKey, SoapSections } from '../../domain/models';
 import {
+  canApproveAndFinalizeReport,
   canRejectAndRegenerateDraft,
   canSaveOrEditDraft,
   deriveSessionDisplayState,
@@ -46,6 +47,7 @@ import {
   formatEncounterDateDisplay,
   formatTimeShort,
 } from './session-formatters';
+import { ClinicianWorkflowProgress } from './ClinicianWorkflowProgress';
 
 interface LocationStateWithSearch {
   readonly fromSessionsSearch?: string;
@@ -68,6 +70,8 @@ export function ClinicalSessionDetailPage() {
   >({});
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileWorkbenchTab>('report');
+  const [workflowStage, setWorkflowStage] = useState<3 | 4>(3);
+  const [openApprovalOnEntry, setOpenApprovalOnEntry] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -203,6 +207,11 @@ export function ClinicalSessionDetailPage() {
 
   const derived = deriveSessionDisplayState(session);
   const canEdit = canSaveOrEditDraft(currentUser, session);
+  const visibleWorkflowStage: 3 | 4 =
+    session.review.status === 'approved_finalized' ? 4 : workflowStage;
+  const canProceedToFinalize = Boolean(
+    report && canApproveAndFinalizeReport(currentUser, session, report) && !hasUnsavedChanges,
+  );
 
   const handleSoapChange = (section: SoapSectionKey, value: string) => {
     setSaveFeedback(null);
@@ -609,14 +618,21 @@ export function ClinicalSessionDetailPage() {
         </div>
       </section>
 
+      <ClinicianWorkflowProgress
+        currentStage={visibleWorkflowStage}
+        completedThrough={visibleWorkflowStage === 4 ? 3 : 2}
+      />
+
       {/* Persistent Workbench Action Bar & Review Status Banner */}
       <Card
         tone={derived.needsClinicianAttention || hasUnsavedChanges ? 'peach' : 'mint'}
         padding="md"
         className={
-          derived.needsClinicianAttention || hasUnsavedChanges
-            ? 'border-l-4 border-l-[#f26b21]'
-            : 'border-l-4 border-l-[#00783c]'
+          visibleWorkflowStage === 4
+            ? 'hidden'
+            : derived.needsClinicianAttention || hasUnsavedChanges
+              ? 'border-l-4 border-l-[#f26b21]'
+              : 'border-l-4 border-l-[#00783c]'
         }
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -753,7 +769,7 @@ export function ClinicalSessionDetailPage() {
       <div
         role="tablist"
         aria-label="Clinical review workbench panels"
-        className="flex lg:hidden rounded-[12px] bg-[#edf5f0] p-1 border border-[#cde0d4] gap-1"
+        className={`${visibleWorkflowStage === 3 ? 'flex' : 'hidden'} rounded-[12px] bg-[#edf5f0] p-1 border border-[#cde0d4] gap-1 max-w-3xl mx-auto w-full`}
       >
         {(
           [
@@ -796,11 +812,11 @@ export function ClinicalSessionDetailPage() {
       </div>
 
       {/* Main Two-Column Clinical Review Workbench Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className={`${visibleWorkflowStage === 3 ? 'grid' : 'hidden'} grid-cols-1 gap-6 items-start max-w-4xl mx-auto w-full`}>
         {/* Left Primary Column: Clarifications + Editable SOAP Report + Revision History */}
         <div
-          className={`min-w-0 lg:col-span-7 space-y-6 ${
-            mobileTab === 'report' ? 'block' : 'hidden lg:block'
+          className={`min-w-0 space-y-6 ${
+            mobileTab === 'report' ? 'block' : 'hidden'
           }`}
         >
           {report && report.clarifications.length > 0 && (
@@ -843,19 +859,6 @@ export function ClinicalSessionDetailPage() {
                 onClearFeedback={() => setSaveFeedback(null)}
               />
 
-              <ClinicalSignOffAndReleasePanel
-                currentUser={currentUser}
-                session={session}
-                report={report}
-                derived={derived}
-                hasUnsavedChanges={hasUnsavedChanges}
-                hasUnsavedSoapChanges={hasUnsavedSoapChanges}
-                hasUnsavedClarificationDrafts={hasUnsavedClarificationDrafts}
-                isMutating={isMutating}
-                sessionAuditEvents={sessionAuditEvents}
-                onApproveAndFinalize={handleApproveAndFinalize}
-                onReleaseToPatient={handleReleaseToPatient}
-              />
             </>
           ) : (
             <ProcessingStatusPanel
@@ -869,12 +872,12 @@ export function ClinicalSessionDetailPage() {
 
         {/* Right Secondary Column: Interactive Transcript & Pipeline Status */}
         <div
-          className={`min-w-0 lg:col-span-5 space-y-6 lg:sticky lg:top-4 ${
-            mobileTab === 'transcript' || mobileTab === 'lifecycle' ? 'block' : 'hidden lg:block'
+          className={`min-w-0 space-y-6 ${
+            mobileTab === 'transcript' || mobileTab === 'lifecycle' ? 'block' : 'hidden'
           }`}
         >
           {/* Transcript & Evidence Panel */}
-          <div className={mobileTab === 'lifecycle' ? 'hidden lg:block' : 'block'}>
+          <div className={mobileTab === 'lifecycle' ? 'hidden' : 'block'}>
             <TranscriptEvidencePanel
               session={session}
               transcript={transcript}
@@ -885,7 +888,7 @@ export function ClinicalSessionDetailPage() {
           </div>
 
           {/* Processing Pipeline Stages */}
-          <div className={mobileTab === 'transcript' ? 'hidden lg:block' : 'block'}>
+          <div className={mobileTab === 'transcript' ? 'hidden' : 'block'}>
             <Card padding="md" className="space-y-4">
               <div className="flex items-center justify-between border-b border-[#e4ece7] pb-3">
                 <div>
@@ -911,12 +914,73 @@ export function ClinicalSessionDetailPage() {
         </div>
       </div>
 
+      {visibleWorkflowStage === 3 && report && (
+        <Card padding="md" className="max-w-4xl mx-auto w-full border-t-4 border-t-[#00783c]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-[#0d4026]">Ready for final review?</p>
+              <p className="text-xs text-[#495057]">
+                {session.review.unresolvedClarificationCount > 0
+                  ? `Resolve ${session.review.unresolvedClarificationCount} open clinical clarification question${session.review.unresolvedClarificationCount === 1 ? '' : 's'} before approving.`
+                  : hasUnsavedSoapChanges
+                    ? `Save or discard your unsaved SOAP section edits before approving Revision v${report.currentRevision}.`
+                    : hasUnsavedClarificationDrafts
+                      ? 'Submit or clear your unsubmitted clarification answer drafts before approving.'
+                      : 'All clarifications are resolved and the current revision is saved.'}
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!canProceedToFinalize || isMutating}
+              iconRight={<ClipboardCheck className="w-4 h-4" aria-hidden="true" />}
+              onClick={() => {
+                setOpenApprovalOnEntry(true);
+                setWorkflowStage(4);
+              }}
+            >
+              Approve &amp; Finalize Report (v{report.currentRevision})
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {visibleWorkflowStage === 4 && report && (
+        <div className="max-w-3xl mx-auto w-full space-y-4">
+          {session.review.status !== 'approved_finalized' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft={<ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />}
+              onClick={() => {
+                setOpenApprovalOnEntry(false);
+                setWorkflowStage(3);
+              }}
+            >
+              Back to report review
+            </Button>
+          )}
+          <ClinicalSignOffAndReleasePanel
+            currentUser={currentUser}
+            session={session}
+            report={report}
+            derived={derived}
+            hasUnsavedChanges={hasUnsavedChanges}
+            hasUnsavedSoapChanges={hasUnsavedSoapChanges}
+            hasUnsavedClarificationDrafts={hasUnsavedClarificationDrafts}
+            isMutating={isMutating}
+            sessionAuditEvents={sessionAuditEvents}
+            openApprovalOnMount={openApprovalOnEntry}
+            onApproveAndFinalize={handleApproveAndFinalize}
+            onReleaseToPatient={handleReleaseToPatient}
+          />
+        </div>
+      )}
+
       {/* 5 Orthogonal Lifecycle Tracks Summary Footer */}
       <section
         aria-label="Session lifecycle tracks"
-        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 ${
-          mobileTab === 'lifecycle' ? 'grid' : 'hidden lg:grid'
-        }`}
+        className="hidden"
       >
         <Card padding="sm" className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[#00783c]">
