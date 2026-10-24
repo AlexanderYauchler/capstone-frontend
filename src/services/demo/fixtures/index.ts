@@ -66,6 +66,12 @@ export const DEMO_PATIENTS: readonly PatientReference[] = [
     dateOfBirthLabel: 'Demo patient · Synthetic record',
     isSyntheticDemo: true,
   },
+  {
+    id: 'pat-john-smith',
+    displayName: 'John Smith',
+    dateOfBirthLabel: 'April 5, 1973 · Synthetic demo record',
+    isSyntheticDemo: true,
+  },
 ] as const;
 
 const COMPLETED_STAGES = [
