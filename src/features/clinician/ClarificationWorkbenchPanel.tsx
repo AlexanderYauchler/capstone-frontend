@@ -43,8 +43,12 @@ export function ClarificationWorkbenchPanel({
   onSaveAnswers,
   onReopenQuestion,
 }: ClarificationWorkbenchPanelProps) {
-  const [editingResolvedIds, setEditingResolvedIds] = useState<ReadonlySet<string>>(new Set());
-  const [validationErrors, setValidationErrors] = useState<Readonly<Record<string, string>>>({});
+  const [editingResolvedIds, setEditingResolvedIds] = useState<
+    ReadonlySet<string>
+  >(new Set());
+  const [validationErrors, setValidationErrors] = useState<
+    Readonly<Record<string, string>>
+  >({});
   const [actionFeedback, setActionFeedback] = useState<{
     readonly tone: 'success' | 'error';
     readonly message: string;
@@ -129,14 +133,17 @@ export function ClarificationWorkbenchPanel({
       (q) => q.status === 'unresolved' || editingResolvedIds.has(q.id),
     );
     const nextErrors: Record<string, string> = {};
-    const validAnswers: Array<{ questionId: string; responseText: string }> = [];
+    const validAnswers: Array<{ questionId: string; responseText: string }> =
+      [];
 
     for (const q of openQuestions) {
       const trimmed = (draftAnswers[q.id] ?? '').trim();
       if (trimmed.length === 0) {
-        nextErrors[q.id] = 'Please enter a clinical clarification response before saving.';
+        nextErrors[q.id] =
+          'Please enter a clinical clarification response before saving.';
       } else if (trimmed.length < MIN_CLARIFICATION_LENGTH) {
-        nextErrors[q.id] = `Please provide a complete clinical clarification (at least ${MIN_CLARIFICATION_LENGTH} characters).`;
+        nextErrors[q.id] =
+          `Please provide a complete clinical clarification (at least ${MIN_CLARIFICATION_LENGTH} characters).`;
       } else {
         validAnswers.push({ questionId: q.id, responseText: trimmed });
       }
@@ -186,7 +193,9 @@ export function ClarificationWorkbenchPanel({
       setActionFeedback({
         tone: 'error',
         message:
-          err instanceof Error ? err.message : 'Unable to reopen clarification question.',
+          err instanceof Error
+            ? err.message
+            : 'Unable to reopen clarification question.',
       });
     }
   };
@@ -194,58 +203,86 @@ export function ClarificationWorkbenchPanel({
   const openQuestionsCount = clarifications.filter(
     (q) => q.status === 'unresolved' || editingResolvedIds.has(q.id),
   ).length;
+  const completionPercent = Math.round(
+    (resolvedCount / clarifications.length) * 100,
+  );
 
   return (
-    <Card
-      tone={unresolvedCount > 0 ? 'peach' : 'mint'}
-      padding="md"
-      className={
-        unresolvedCount > 0
-          ? 'space-y-4 border-[#f26b21]/50'
-          : 'space-y-4 border-[#00783c]/40'
-      }
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#056233]/20 pb-3">
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-2">
-            <MessageSquareWarning
-              className={`w-5 h-5 ${unresolvedCount > 0 ? 'text-[#f26b21]' : 'text-[#00783c]'}`}
-              aria-hidden="true"
-            />
-            <h2 className="text-lg font-bold text-[#0d4026] font-display">
-              Clinical Clarification Questions ({clarifications.length})
-            </h2>
+    <Card tone="elevated" padding="none" className="overflow-hidden">
+      <div className="border-b border-[#dce6e1] bg-gradient-to-r from-white to-[#f4f9f6] px-4 py-4 sm:px-6 sm:py-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                unresolvedCount > 0
+                  ? 'bg-[#fff1e8] text-[#b84e0b]'
+                  : 'bg-[#e5f3eb] text-[#00783c]'
+              }`}
+            >
+              <MessageSquareWarning className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#00783c]">
+                Clinical review
+              </p>
+              <h2 className="font-display text-lg font-bold text-[#0d4026] sm:text-xl">
+                Clinical Clarification Questions ({clarifications.length})
+              </h2>
+              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[#495057] sm:text-sm">
+                {unresolvedCount > 0
+                  ? 'Verify ambiguous details against the chart and transcript. A response remains a draft until it is explicitly saved.'
+                  : 'All flagged details have a recorded clinician response in the current report revision.'}
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-[#495057]">
-            {unresolvedCount > 0
-              ? 'Resolve ambiguous clinical details below. Typing an answer does not resolve a blocker until you explicitly save the response.'
-              : 'All flagged clinical clarification questions have been answered and recorded in the current draft revision.'}
-          </p>
+
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <StatusBadge tone={unresolvedCount > 0 ? 'warning' : 'success'}>
+              {unresolvedCount > 0
+                ? `${unresolvedCount} Unresolved · ${resolvedCount} Resolved`
+                : `All ${clarifications.length} Resolved`}
+            </StatusBadge>
+            {canEdit && openQuestionsCount > 1 && (
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={isSubmitting}
+                onClick={() => void handleSaveAllOpen()}
+                className="w-full sm:w-auto"
+              >
+                Save All Responses ({openQuestionsCount})
+              </Button>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge tone={unresolvedCount > 0 ? 'warning' : 'success'}>
-            {unresolvedCount > 0
-              ? `${unresolvedCount} Unresolved · ${resolvedCount} Resolved`
-              : `All ${clarifications.length} Resolved`}
-          </StatusBadge>
-          {canEdit && openQuestionsCount > 1 && (
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={isSubmitting}
-              onClick={() => void handleSaveAllOpen()}
-            >
-              Save All Responses ({openQuestionsCount})
-            </Button>
-          )}
+        <div
+          className="mt-4 flex items-center gap-3"
+          aria-label={`${completionPercent}% complete`}
+        >
+          <div
+            className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#dce6e1]"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={clarifications.length}
+            aria-valuenow={resolvedCount}
+            aria-label="Clarification questions resolved"
+          >
+            <div
+              className="h-full rounded-full bg-[#00783c] transition-[width] duration-300"
+              style={{ width: `${completionPercent}%` }}
+            />
+          </div>
+          <span className="shrink-0 text-[11px] font-semibold text-[#495057]">
+            {resolvedCount} of {clarifications.length} complete
+          </span>
         </div>
       </div>
 
       {actionFeedback && (
         <div
           role={actionFeedback.tone === 'error' ? 'alert' : 'status'}
-          className={`rounded-[10px] px-3.5 py-2.5 text-xs font-semibold flex items-center justify-between gap-2 border ${
+          className={`mx-4 mt-4 flex items-start justify-between gap-3 rounded-[10px] border px-3.5 py-2.5 text-xs font-semibold sm:mx-6 ${
             actionFeedback.tone === 'error'
               ? 'bg-[var(--color-danger-soft)] border-[var(--color-danger-border)] text-[var(--color-danger)]'
               : 'bg-[#e8f4ed] border-[#00783c]/40 text-[#0d4026]'
@@ -255,94 +292,137 @@ export function ClarificationWorkbenchPanel({
             {actionFeedback.tone === 'error' ? (
               <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-[#00783c]" aria-hidden="true" />
+              <CheckCircle2
+                className="w-4 h-4 shrink-0 text-[#00783c]"
+                aria-hidden="true"
+              />
             )}
             <span>{actionFeedback.message}</span>
           </span>
           <button
             type="button"
             onClick={() => setActionFeedback(null)}
-            className="text-[11px] underline hover:no-underline cursor-pointer"
+            className="shrink-0 cursor-pointer rounded text-[11px] underline hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#02754b]"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      <div className="space-y-3.5">
+      <div className="space-y-4 p-4 sm:p-6">
         {clarifications.map((item) => {
           const isEditingResolved = editingResolvedIds.has(item.id);
           const isUnresolved = item.status === 'unresolved';
           const showEditor = canEdit && (isUnresolved || isEditingResolved);
           const draftValue = draftAnswers[item.id] ?? '';
           const hasDraftText = draftValue.trim().length > 0;
-          const isLinkedSegmentSelected = activeSegmentId === item.sourceSegmentId;
+          const isLinkedSegmentSelected =
+            activeSegmentId === item.sourceSegmentId;
           const fieldError = validationErrors[item.id];
           const textareaId = `clarification-input-${item.id}`;
+          const helperId = `${textareaId}-helper`;
+          const describedBy = fieldError
+            ? `${helperId} ${textareaId}-error`
+            : helperId;
 
           return (
-            <div
+            <section
               key={item.id}
-              className={`bg-white rounded-[12px] p-4 border transition-colors space-y-3 ${
+              aria-labelledby={`clarification-title-${item.id}`}
+              className={`overflow-hidden rounded-[14px] border bg-white transition-all ${
                 isLinkedSegmentSelected
-                  ? 'border-[#00783c] ring-2 ring-[#00783c]/25'
+                  ? 'border-[#00783c] ring-2 ring-[#00783c]/20'
                   : isUnresolved
-                    ? 'border-[#f26b21]/50'
-                    : 'border-[#056233]/25'
+                    ? 'border-[#efb58f] shadow-[0_8px_24px_-18px_rgba(154,68,6,0.5)]'
+                    : 'border-[#cde0d4]'
               }`}
             >
-              {/* Top Metadata & Source Timestamp Link */}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#9a4406]">
-                    Question {item.orderIndex}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onInspectSegment(item.sourceSegmentId)}
-                    aria-pressed={isLinkedSegmentSelected}
-                    className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border transition-colors cursor-pointer ${
-                      isLinkedSegmentSelected
-                        ? 'bg-[#00783c] text-white border-[#00783c]'
-                        : 'bg-[#edf5f0] text-[#00783c] border-[#cde0d4] hover:bg-[#dcebe2]'
-                    }`}
-                  >
-                    <CornerDownRight className="w-3 h-3" aria-hidden="true" />
-                    <span>Inspect transcript at {item.sourceTimestamp}</span>
-                  </button>
+              <div
+                className={`border-l-4 px-4 py-4 sm:px-5 ${
+                  isUnresolved ? 'border-l-[#f26b21]' : 'border-l-[#00783c]'
+                }`}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        isUnresolved
+                          ? 'bg-[#fff1e8] text-[#9a4406]'
+                          : 'bg-[#e5f3eb] text-[#00783c]'
+                      }`}
+                    >
+                      {item.orderIndex}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#66726c]">
+                        Clarification {item.orderIndex}
+                      </p>
+                      <h3
+                        id={`clarification-title-${item.id}`}
+                        className="mt-1 text-sm font-bold leading-snug text-[#0d4026] sm:text-base"
+                      >
+                        {item.prompt}
+                      </h3>
+                    </div>
+                  </div>
+                  <div className="shrink-0 self-start">
+                    {isUnresolved ? (
+                      <StatusBadge tone="warning">
+                        {hasDraftText
+                          ? 'Unsaved Response · Requires Save'
+                          : 'Requires Physician Input'}
+                      </StatusBadge>
+                    ) : (
+                      <StatusBadge tone="success">Resolved</StatusBadge>
+                    )}
+                  </div>
                 </div>
 
-                {isUnresolved ? (
-                  <StatusBadge tone="warning">
-                    {hasDraftText
-                      ? 'Unsaved Response · Requires Save'
-                      : 'Requires Physician Input'}
-                  </StatusBadge>
-                ) : (
-                  <StatusBadge tone="success">Resolved</StatusBadge>
-                )}
-              </div>
+                <div className="mt-4 rounded-[10px] border border-[#dce6e1] bg-[#f7faf8] p-3 sm:p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#495057]">
+                      Supporting transcript
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onInspectSegment(item.sourceSegmentId)}
+                      aria-pressed={isLinkedSegmentSelected}
+                      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[8px] border px-3 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#02754b] sm:min-h-0 sm:justify-start sm:py-1.5 ${
+                        isLinkedSegmentSelected
+                          ? 'border-[#00783c] bg-[#00783c] text-white'
+                          : 'cursor-pointer border-[#cde0d4] bg-white text-[#00783c] hover:bg-[#edf5f0]'
+                      }`}
+                    >
+                      <CornerDownRight
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
+                      <span>Inspect transcript at {item.sourceTimestamp}</span>
+                    </button>
+                  </div>
+                  <blockquote className="mt-2 border-l-2 border-l-[#00783c] pl-3 text-xs italic leading-relaxed text-[#495057] sm:text-sm">
+                    &ldquo;{item.sourceQuote}&rdquo;
+                  </blockquote>
+                </div>
 
-              {/* Question Prompt & Verbatim Quote */}
-              <div className="space-y-1.5">
-                <h3 className="text-sm sm:text-base font-bold text-[#0d4026]">{item.prompt}</h3>
-                <blockquote className="text-xs italic text-[#495057] bg-[#f7f8f8] px-3 py-2 rounded border-l-3 border-l-[#00783c]">
-                  &ldquo;{item.sourceQuote}&rdquo;
-                </blockquote>
-                <p className="text-xs text-[#242628]">
-                  <strong>Clinical rationale:</strong> {item.clinicalRationale}
+                <p className="mt-3 text-xs leading-relaxed text-[#3f4844] sm:text-[13px]">
+                  <strong className="text-[#0d4026]">
+                    Why this needs review:
+                  </strong>{' '}
+                  {item.clinicalRationale}
                 </p>
               </div>
 
-              {/* Interactive Response Editor OR Saved Response Display */}
               {showEditor ? (
-                <div className="space-y-2.5 pt-2 border-t border-[#e4ece7]">
+                <div className="space-y-3 border-t border-[#e4ece7] bg-[#fbfcfb] px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label
                       htmlFor={textareaId}
                       className="text-xs font-bold text-[#0d4026]"
                     >
-                      Clinician clarification response (Question {item.orderIndex})
+                      Clinician clarification response (Question{' '}
+                      {item.orderIndex})
                     </label>
                     <button
                       type="button"
@@ -354,7 +434,7 @@ export function ClarificationWorkbenchPanel({
                           return next;
                         });
                       }}
-                      className="inline-flex items-center gap-1 text-[11.5px] font-bold text-[#00783c] hover:text-[#0d4026] underline underline-offset-2 cursor-pointer"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded text-[11.5px] font-bold text-[#00783c] underline underline-offset-2 hover:text-[#0d4026] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#02754b]"
                     >
                       <Sparkles className="w-3 h-3" aria-hidden="true" />
                       <span>Use chart-verified note</span>
@@ -363,7 +443,7 @@ export function ClarificationWorkbenchPanel({
 
                   <textarea
                     id={textareaId}
-                    rows={2}
+                    rows={4}
                     value={draftValue}
                     onChange={(e) => {
                       onDraftAnswerChange(item.id, e.target.value);
@@ -377,8 +457,8 @@ export function ClarificationWorkbenchPanel({
                     }}
                     placeholder={`Enter verified clinical response for Question ${item.orderIndex}…`}
                     aria-invalid={Boolean(fieldError)}
-                    aria-describedby={fieldError ? `${textareaId}-error` : undefined}
-                    className="w-full rounded-[10px] border border-[#b5c7be] bg-white px-3 py-2 text-sm text-[#242628] focus:border-[#00783c] focus:outline-none focus:ring-2 focus:ring-[#00783c]/20"
+                    aria-describedby={describedBy}
+                    className="min-h-28 w-full resize-y rounded-[10px] border border-[#aebfb6] bg-white px-3.5 py-3 text-sm leading-relaxed text-[#242628] shadow-inner focus:border-[#00783c] focus:outline-none focus:ring-2 focus:ring-[#00783c]/20"
                   />
 
                   {fieldError && (
@@ -387,25 +467,32 @@ export function ClarificationWorkbenchPanel({
                       role="alert"
                       className="text-xs font-semibold text-[var(--color-danger)] flex items-center gap-1.5"
                     >
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      <AlertCircle
+                        className="w-3.5 h-3.5 shrink-0"
+                        aria-hidden="true"
+                      />
                       <span>{fieldError}</span>
                     </p>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <span className="text-[11px] text-[#495057]">
+                  <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span
+                      id={helperId}
+                      className="text-[11px] leading-relaxed text-[#495057]"
+                    >
                       {isEditingResolved
                         ? 'Saving will record a new report revision with your updated clarification.'
                         : 'Response remains a local draft until you click Save Clarification Response.'}
                     </span>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
                       {isEditingResolved && (
                         <Button
                           variant="secondary"
                           size="sm"
                           disabled={isSubmitting}
                           onClick={() => toggleEditResolved(item, false)}
+                          className="w-full sm:w-auto"
                         >
                           Cancel Edit
                         </Button>
@@ -415,6 +502,7 @@ export function ClarificationWorkbenchPanel({
                         size="sm"
                         disabled={isSubmitting}
                         onClick={() => void handleSaveSingle(item)}
+                        className="w-full sm:w-auto"
                       >
                         {isEditingResolved
                           ? 'Update Clarification Response'
@@ -424,23 +512,27 @@ export function ClarificationWorkbenchPanel({
                   </div>
                 </div>
               ) : item.status === 'resolved' && item.response ? (
-                <div className="rounded-[10px] bg-[#edf5f0] border border-[#cde0d4] p-3 space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-3 border-t border-[#cde0d4] bg-[#f1f8f4] px-4 py-4 sm:px-5">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00783c]">
-                      <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      <CheckCircle2
+                        className="w-3.5 h-3.5"
+                        aria-hidden="true"
+                      />
                       <span>
-                        Clinician Response · {item.response.respondedByDisplayName} (
+                        Clinician Response ·{' '}
+                        {item.response.respondedByDisplayName} (
                         {formatTimeShort(item.response.respondedAt)})
                       </span>
                     </span>
 
                     {canEdit && (
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                         <button
                           type="button"
                           disabled={isSubmitting}
                           onClick={() => toggleEditResolved(item, true)}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-[#00783c] hover:text-[#0d4026] underline underline-offset-2 cursor-pointer"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded text-xs font-bold text-[#00783c] underline underline-offset-2 hover:text-[#0d4026] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#02754b] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Edit3 className="w-3 h-3" aria-hidden="true" />
                           <span>Edit Response</span>
@@ -449,7 +541,7 @@ export function ClarificationWorkbenchPanel({
                           type="button"
                           disabled={isSubmitting}
                           onClick={() => void handleReopen(item)}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-[#9a4406] hover:text-[#7a3404] underline underline-offset-2 cursor-pointer"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded text-xs font-bold text-[#9a4406] underline underline-offset-2 hover:text-[#7a3404] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a4406] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <RotateCcw className="w-3 h-3" aria-hidden="true" />
                           <span>Reopen Question</span>
@@ -457,12 +549,12 @@ export function ClarificationWorkbenchPanel({
                       </div>
                     )}
                   </div>
-                  <p className="text-sm font-medium text-[#0d4026] whitespace-pre-wrap">
+                  <p className="whitespace-pre-wrap rounded-[8px] border border-[#cde0d4] bg-white px-3 py-2.5 text-sm font-medium leading-relaxed text-[#0d4026]">
                     {item.response.responseText}
                   </p>
                 </div>
               ) : null}
-            </div>
+            </section>
           );
         })}
       </div>
