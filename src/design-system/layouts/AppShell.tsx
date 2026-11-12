@@ -1,20 +1,32 @@
-import { useState, type ReactNode } from 'react';
-import { Drawer } from '../components/Drawer';
-import { DemoSimulationBar } from './DemoSimulationBar';
-import { ParkviewFooter } from './ParkviewFooter';
-import { Sidebar } from './Sidebar';
-import { TopBar } from './TopBar';
+import { useState, type ReactNode } from "react";
+import { Drawer } from "../components/Drawer";
+import { DemoSimulationBar } from "./DemoSimulationBar";
+import { ParkviewFooter } from "./ParkviewFooter";
+import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
+import { useAuth } from "../../app/providers/AuthProvider";
+import { useWorkspacePreferences } from "../../app/providers/useWorkspacePreferences";
 
 export interface AppShellProps {
-  readonly variant?: 'login' | 'workspace';
+  readonly variant?: "login" | "workspace";
   readonly children: ReactNode;
 }
 
-export function AppShell({ variant = 'workspace', children }: AppShellProps) {
+export function AppShell({ variant = "workspace", children }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { currentUser } = useAuth();
+  const { data: preferences } = useWorkspacePreferences(
+    variant === "workspace" &&
+      (currentUser.role === "clinician" || currentUser.role === "admin"),
+  );
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden flex flex-col bg-white text-[#242628]">
+    <div
+      data-density={
+        variant === "workspace" ? preferences?.interfaceDensity : undefined
+      }
+      className="min-h-screen w-full overflow-x-hidden flex flex-col bg-white text-[#242628]"
+    >
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:text-[#0d4026] focus:font-bold focus:px-4 focus:py-2 focus:rounded-[8px] focus:shadow-md"
@@ -51,11 +63,15 @@ export function AppShell({ variant = 'workspace', children }: AppShellProps) {
       </Drawer>
 
       {/* Main Content Area */}
-      <main id="main-content" tabIndex={-1} className="flex-1 w-full focus:outline-none">
-        {variant === 'login' ? (
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex-1 w-full focus:outline-none"
+      >
+        {variant === "login" ? (
           children
         ) : (
-          <div className="max-w-[1320px] mx-auto px-4 sm:px-8 py-5 sm:py-7">
+          <div className="workspace-content max-w-[1320px] mx-auto px-4 sm:px-8 py-5 sm:py-7">
             {children}
           </div>
         )}
