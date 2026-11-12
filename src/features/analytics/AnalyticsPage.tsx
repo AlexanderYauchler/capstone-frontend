@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
@@ -27,7 +27,7 @@ import type { AnalyticsFilterCriteria, AnalyticsSummaryResponse } from '../../do
 import { Button } from '../../design-system/components/Button';
 import { Card } from '../../design-system/components/Card';
 import { PageHeader } from '../../design-system/components/PageHeader';
-import { StatCard } from '../../design-system/components/StatCard';
+import { StatCard, type StatComparison } from '../../design-system/components/StatCard';
 import { BreakdownTable } from '../../design-system/components/charts/BreakdownTable';
 import { ColumnChart } from '../../design-system/components/charts/ColumnChart';
 import { LineChart } from '../../design-system/components/charts/LineChart';
@@ -69,6 +69,36 @@ function formatYmd(ymd: string): string {
 // Filter panel (draft state; applies to the URL on submit)
 // ----------------------------------------------------------------------------
 
+function SelectField({
+  id,
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className={LABEL_CLASS}>
+        {label}
+      </label>
+      <select
+        id={id}
+        className={FIELD_CLASS}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {children}
+      </select>
+    </div>
+  );
+}
+
 function AnalyticsFilterPanel({
   criteria,
   availableMonths,
@@ -107,165 +137,162 @@ function AnalyticsFilterPanel({
     (p) => p.from() === draft.dateFrom && draft.dateTo === REFERENCE_DATE,
   );
 
+  // Less-used filters live in "More filters"; it opens by itself when one is applied.
+  const moreFiltersApplied =
+    (criteria.ageGroup !== 'all' ? 1 : 0) +
+    (criteria.sex !== 'all' ? 1 : 0) +
+    (criteria.view === 'monthly'
+      ? criteria.reportStatus !== 'all'
+        ? 1
+        : 0
+      : criteria.documentationStatus === 'all_statuses'
+        ? 1
+        : 0);
+
   return (
     <form
       onSubmit={handleSubmit}
       aria-label="Analytics filters"
-      className="bg-[#edf5f0] border border-[#cde0d4] rounded-[14px] p-4 sm:p-5 space-y-4"
+      className="bg-white border border-[var(--color-border)] rounded-[14px] p-4 sm:p-5 space-y-4"
     >
-      <div className="flex items-center gap-2 text-sm font-bold text-[#0d4026]">
-        <Filter className="w-4 h-4 text-[#00783c]" aria-hidden="true" />
-        Filters
-        <span className="font-normal text-xs text-[#495057]">
-          Choose filters, then select Apply. Every chart and number below updates together.
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-base font-bold text-[#0d4026] font-display">
+          <Filter className="w-4 h-4 text-[#00783c]" aria-hidden="true" />
+          Filters
+        </h2>
+        {!isMonthly && (
+          <div role="group" aria-label="Quick date ranges" className="flex flex-wrap gap-2">
+            {DATE_PRESETS.map((p) => {
+              const pressed = activePreset?.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  aria-pressed={pressed}
+                  onClick={() => update({ dateFrom: p.from(), dateTo: REFERENCE_DATE })}
+                  className={[
+                    'px-3 py-1.5 rounded-full text-sm font-semibold border cursor-pointer transition-colors',
+                    pressed
+                      ? 'bg-[#02754b] text-white border-[#02754b]'
+                      : 'bg-white text-[#0d4026] border-[#cde0d4] hover:bg-[#edf5f0]',
+                  ].join(' ')}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {isMonthly ? (
           <>
-            <div>
-              <label htmlFor="filter-year" className={LABEL_CLASS}>
-                Year
-              </label>
-              <select
-                id="filter-year"
-                className={FIELD_CLASS}
-                value={draftYear}
-                onChange={(e) => {
-                  const firstInYear = availableMonths.find((m) => m.monthKey.startsWith(e.target.value));
-                  update({ monthKey: firstInYear?.monthKey ?? draft.monthKey });
-                }}
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="filter-month" className={LABEL_CLASS}>
-                Month
-              </label>
-              <select
-                id="filter-month"
-                className={FIELD_CLASS}
-                value={draft.monthKey}
-                onChange={(e) => update({ monthKey: e.target.value })}
-              >
-                {monthsInYear.map((m) => (
-                  <option key={m.monthKey} value={m.monthKey}>
-                    {m.label.split(' ')[0]}
-                    {m.monthKey === REFERENCE_DATE.slice(0, 7) ? ' (in progress)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectField
+              id="filter-year"
+              label="Year"
+              value={draftYear}
+              onChange={(v) => {
+                const firstInYear = availableMonths.find((m) => m.monthKey.startsWith(v));
+                update({ monthKey: firstInYear?.monthKey ?? draft.monthKey });
+              }}
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
+              id="filter-month"
+              label="Month"
+              value={draft.monthKey}
+              onChange={(v) => update({ monthKey: v })}
+            >
+              {monthsInYear.map((m) => (
+                <option key={m.monthKey} value={m.monthKey}>
+                  {m.label.split(' ')[0]}
+                  {m.monthKey === REFERENCE_DATE.slice(0, 7) ? ' (in progress)' : ''}
+                </option>
+              ))}
+            </SelectField>
           </>
         ) : (
           <>
             <div>
-              <label htmlFor="filter-range-preset" className={LABEL_CLASS}>
-                Date range
+              <label htmlFor="filter-from" className={LABEL_CLASS}>
+                From
               </label>
-              <select
-                id="filter-range-preset"
+              <input
+                id="filter-from"
+                type="date"
                 className={FIELD_CLASS}
-                value={activePreset?.id ?? 'custom'}
-                onChange={(e) => {
-                  const preset = DATE_PRESETS.find((p) => p.id === e.target.value);
-                  if (preset) update({ dateFrom: preset.from(), dateTo: REFERENCE_DATE });
-                }}
-              >
-                {DATE_PRESETS.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-                <option value="custom">Custom range</option>
-              </select>
+                min={datasetRange?.from}
+                max={REFERENCE_DATE}
+                value={draft.dateFrom}
+                onChange={(e) => e.target.value && update({ dateFrom: e.target.value })}
+              />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label htmlFor="filter-from" className={LABEL_CLASS}>
-                  From
-                </label>
-                <input
-                  id="filter-from"
-                  type="date"
-                  className={FIELD_CLASS}
-                  min={datasetRange?.from}
-                  max={REFERENCE_DATE}
-                  value={draft.dateFrom}
-                  onChange={(e) => e.target.value && update({ dateFrom: e.target.value })}
-                />
-              </div>
-              <div>
-                <label htmlFor="filter-to" className={LABEL_CLASS}>
-                  To
-                </label>
-                <input
-                  id="filter-to"
-                  type="date"
-                  className={FIELD_CLASS}
-                  min={datasetRange?.from}
-                  max={REFERENCE_DATE}
-                  value={draft.dateTo}
-                  onChange={(e) => e.target.value && update({ dateTo: e.target.value })}
-                />
-              </div>
+            <div>
+              <label htmlFor="filter-to" className={LABEL_CLASS}>
+                To
+              </label>
+              <input
+                id="filter-to"
+                type="date"
+                className={FIELD_CLASS}
+                min={datasetRange?.from}
+                max={REFERENCE_DATE}
+                value={draft.dateTo}
+                onChange={(e) => e.target.value && update({ dateTo: e.target.value })}
+              />
             </div>
           </>
         )}
 
-        <div>
-          <label htmlFor="filter-diagnosis" className={LABEL_CLASS}>
-            Diagnosis category
-          </label>
-          <select
-            id="filter-diagnosis"
-            className={FIELD_CLASS}
-            value={draft.diagnosis}
-            onChange={(e) => update({ diagnosis: e.target.value as AnalyticsFilterCriteria['diagnosis'] })}
-          >
-            <option value="all">All diagnoses</option>
-            {DIAGNOSIS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SelectField
+          id="filter-diagnosis"
+          label="Diagnosis category"
+          value={draft.diagnosis}
+          onChange={(v) => update({ diagnosis: v as AnalyticsFilterCriteria['diagnosis'] })}
+        >
+          <option value="all">All diagnoses</option>
+          {DIAGNOSIS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </SelectField>
 
-        <div>
-          <label htmlFor="filter-department" className={LABEL_CLASS}>
-            Department
-          </label>
-          <select
-            id="filter-department"
-            className={FIELD_CLASS}
-            value={draft.department}
-            onChange={(e) => update({ department: e.target.value as AnalyticsFilterCriteria['department'] })}
-          >
-            <option value="all">All departments</option>
-            {DEPARTMENT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SelectField
+          id="filter-department"
+          label="Department"
+          value={draft.department}
+          onChange={(v) => update({ department: v as AnalyticsFilterCriteria['department'] })}
+        >
+          <option value="all">All departments</option>
+          {DEPARTMENT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </SelectField>
+      </div>
 
-        <div>
-          <label htmlFor="filter-age" className={LABEL_CLASS}>
-            Age group
-          </label>
-          <select
+      <details open={moreFiltersApplied > 0} className="group">
+        <summary className="inline-flex items-center gap-1.5 cursor-pointer text-sm font-bold text-[#00783c] hover:text-[#0d4026] list-none">
+          <ChevronRight
+            className="w-4 h-4 transition-transform group-open:rotate-90"
+            aria-hidden="true"
+          />
+          More filters{moreFiltersApplied > 0 ? ` (${moreFiltersApplied} applied)` : ''}
+        </summary>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3">
+          <SelectField
             id="filter-age"
-            className={FIELD_CLASS}
+            label="Age group"
             value={draft.ageGroup}
-            onChange={(e) => update({ ageGroup: e.target.value as AnalyticsFilterCriteria['ageGroup'] })}
+            onChange={(v) => update({ ageGroup: v as AnalyticsFilterCriteria['ageGroup'] })}
           >
             <option value="all">All ages</option>
             {AGE_OPTIONS.map((o) => (
@@ -273,18 +300,13 @@ function AnalyticsFilterPanel({
                 {o.label}
               </option>
             ))}
-          </select>
-        </div>
+          </SelectField>
 
-        <div>
-          <label htmlFor="filter-sex" className={LABEL_CLASS}>
-            Sex
-          </label>
-          <select
+          <SelectField
             id="filter-sex"
-            className={FIELD_CLASS}
+            label="Sex"
             value={draft.sex}
-            onChange={(e) => update({ sex: e.target.value as AnalyticsFilterCriteria['sex'] })}
+            onChange={(v) => update({ sex: v as AnalyticsFilterCriteria['sex'] })}
           >
             <option value="all">All</option>
             {SEX_OPTIONS.map((o) => (
@@ -292,21 +314,14 @@ function AnalyticsFilterPanel({
                 {o.label}
               </option>
             ))}
-          </select>
-        </div>
+          </SelectField>
 
-        {isMonthly ? (
-          <div>
-            <label htmlFor="filter-status" className={LABEL_CLASS}>
-              Report status
-            </label>
-            <select
+          {isMonthly ? (
+            <SelectField
               id="filter-status"
-              className={FIELD_CLASS}
+              label="Report status"
               value={draft.reportStatus}
-              onChange={(e) =>
-                update({ reportStatus: e.target.value as AnalyticsFilterCriteria['reportStatus'] })
-              }
+              onChange={(v) => update({ reportStatus: v as AnalyticsFilterCriteria['reportStatus'] })}
             >
               <option value="all">All statuses</option>
               {STATUS_OPTIONS.map((o) => (
@@ -314,25 +329,28 @@ function AnalyticsFilterPanel({
                   {o.label}
                 </option>
               ))}
-            </select>
-          </div>
-        ) : (
-          <div className="flex items-end">
-            <label htmlFor="filter-docs" className="flex items-start gap-2 text-xs text-[#242628] cursor-pointer pb-1">
-              <input
-                id="filter-docs"
-                type="checkbox"
-                className="mt-0.5 w-4 h-4 accent-[#00783c]"
-                checked={draft.documentationStatus === 'all_statuses'}
-                onChange={(e) =>
-                  update({ documentationStatus: e.target.checked ? 'all_statuses' : 'verified_only' })
-                }
-              />
-              <span>Include visits still awaiting review (not yet privacy-verified)</span>
-            </label>
-          </div>
-        )}
-      </div>
+            </SelectField>
+          ) : (
+            <div className="flex items-end sm:col-span-2">
+              <label
+                htmlFor="filter-docs"
+                className="flex items-start gap-2 text-sm text-[#242628] cursor-pointer pb-1"
+              >
+                <input
+                  id="filter-docs"
+                  type="checkbox"
+                  className="mt-0.5 w-4 h-4 accent-[#00783c]"
+                  checked={draft.documentationStatus === 'all_statuses'}
+                  onChange={(e) =>
+                    update({ documentationStatus: e.target.checked ? 'all_statuses' : 'verified_only' })
+                  }
+                />
+                <span>Include visits still awaiting review (not yet privacy-verified)</span>
+              </label>
+            </div>
+          )}
+        </div>
+      </details>
 
       {error && (
         <p role="alert" className="text-sm font-semibold text-[var(--color-danger)]">
@@ -340,7 +358,7 @@ function AnalyticsFilterPanel({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5 border-t border-[#e4ece7] pt-4">
         <Button type="submit" variant="primary" size="sm">
           Apply filters
         </Button>
@@ -353,6 +371,9 @@ function AnalyticsFilterPanel({
         >
           Reset
         </Button>
+        <span className="text-sm text-[#495057]">
+          Every chart and number below updates when you apply.
+        </span>
       </div>
     </form>
   );
@@ -419,7 +440,6 @@ export function AnalyticsPage() {
           { label: ROLE_WORKSPACE_LABELS[currentUser.role], to: currentUser.role === 'clinician' ? '/clinician/dashboard' : undefined },
           { label: 'Healthcare analytics' },
         ]}
-        eyebrow="Synthetic, de-identified demonstration data"
         title={isMonthly ? 'Monthly documentation analytics' : 'Healthcare analytics'}
         description={
           isMonthly
@@ -467,7 +487,7 @@ export function AnalyticsPage() {
       />
 
       {/* Selected filter indicators */}
-      <div className="flex flex-wrap items-center gap-2 text-xs" aria-live="polite">
+      <div className="flex flex-wrap items-center gap-2 text-sm" aria-live="polite">
         <span className="font-bold text-[#0d4026]">Showing:</span>
         <span className="px-2.5 py-1 rounded-full bg-white border border-[#cde0d4] text-[#242628] font-semibold">
           {scopeSummary}
@@ -538,6 +558,22 @@ export function AnalyticsPage() {
   );
 }
 
+/** Builds a plain-language month-over-month comparison; arrows and words carry the meaning, not colour alone. */
+function compareCounts(
+  current: number,
+  previous: number,
+  previousName: string,
+  goodDirection: 'up' | 'down' | 'neither',
+  upWord: string,
+  downWord: string,
+): StatComparison {
+  const diff = Math.round((current - previous) * 10) / 10;
+  if (diff === 0) return { direction: 'flat', text: `Same as ${previousName}`, tone: 'neutral' };
+  const direction = diff > 0 ? 'up' : 'down';
+  const tone = goodDirection === 'neither' ? 'neutral' : direction === goodDirection ? 'good' : 'bad';
+  return { direction, text: `${Math.abs(diff)} ${diff > 0 ? upWord : downWord} than ${previousName}`, tone };
+}
+
 function EmptyState({ message, onReset }: { readonly message: string; readonly onReset: () => void }) {
   return (
     <Card padding="lg" className="text-center space-y-3">
@@ -562,6 +598,12 @@ function OverviewView({ data, onReset }: { readonly data: AnalyticsSummaryRespon
       />
     );
   }
+  const granularity =
+    data.weeklyVisitTrends.length > 20 ||
+    data.weeklyVisitTrends.some((w) => /^[A-Z][a-z]{2}$/.test(w.weekLabel))
+      ? 'month'
+      : 'week';
+
   return (
     <>
       <section aria-label="Population summary" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -605,10 +647,10 @@ function OverviewView({ data, onReset }: { readonly data: AnalyticsSummaryRespon
 
       <ColumnChart
         title="Visits over time"
-        description={`Number of visits per ${data.weeklyVisitTrends.length > 20 || data.weeklyVisitTrends.some((w) => /^[A-Z][a-z]{2}$/.test(w.weekLabel)) ? 'month' : 'week'} in the selected date range. Periods with fewer than 5 visits are hidden.`}
+        description={`Visits per ${granularity} in the selected dates. Periods with fewer than 5 visits are hidden to protect privacy.`}
         data={data.weeklyVisitTrends.map((w) => ({ label: w.weekLabel, value: w.metric.isSuppressed ? null : w.metric.count }))}
         yAxisLabel="Visits"
-        xAxisLabel="Period starting"
+        xAxisLabel={granularity === 'month' ? 'Month' : 'Week starting'}
         unit="visits"
       />
 
@@ -618,12 +660,14 @@ function OverviewView({ data, onReset }: { readonly data: AnalyticsSummaryRespon
           description="Share of visits by the main symptom recorded."
           rows={data.symptomDistribution.map((s) => ({ key: s.symptom, label: s.symptom, metric: s.metric }))}
           totalLabel="Visits (%)"
+          sortByValue
         />
         <BreakdownTable
           title="Diagnosis category"
           description="Share of visits by diagnosis category."
           rows={data.diagnosisBreakdown}
           totalLabel="Visits (%)"
+          sortByValue
         />
         <BreakdownTable
           title="Age group"
@@ -661,6 +705,28 @@ function MonthlyView({
   const highlightIndex = data.monthlyTrend.findIndex((p) => p.monthKey === k.monthKey);
   const isCurrentMonth = k.monthKey === REFERENCE_DATE.slice(0, 7);
 
+  // Compare with the month before, except for a month still in progress (it would look artificially low).
+  const rowIndex = data.monthlyOperations.findIndex((r) => r.monthKey === k.monthKey);
+  const prev = rowIndex > 0 ? data.monthlyOperations[rowIndex - 1] : undefined;
+  const prevName = prev?.monthLabel.split(' ')[0] ?? '';
+  const canCompare = !isCurrentMonth && prev !== undefined && prev.sessionsCreated > 0;
+  const prevRate = prev && prev.sessionsCreated > 0 ? Math.round((prev.finalizedReports / prev.sessionsCreated) * 100) : null;
+  const prevMedianSeconds = prev?.medianReviewDurationSeconds ?? null;
+  const prevMedianMin = prevMedianSeconds === null ? null : Math.round(prevMedianSeconds / 6) / 10;
+  const currMedianMin = k.medianReviewMinutes === null ? null : Math.round(k.medianReviewMinutes * 10) / 10;
+
+  const sessionsCmp = canCompare && prev ? compareCounts(k.totalSessions, prev.sessionsCreated, prevName, 'neither', 'more', 'fewer') : undefined;
+  const completedCmp = canCompare && prev ? compareCounts(k.completedReports, prev.finalizedReports, prevName, 'up', 'more', 'fewer') : undefined;
+  const awaitingCmp = canCompare && prev ? compareCounts(k.awaitingReview, prev.pendingReviewsAtPeriodEnd, prevName, 'down', 'more', 'fewer') : undefined;
+  const rateCmp =
+    canCompare && k.completionRatePct !== null && prevRate !== null
+      ? compareCounts(k.completionRatePct, prevRate, prevName, 'up', 'points higher', 'points lower')
+      : undefined;
+  const reviewCmp =
+    canCompare && currMedianMin !== null && prevMedianMin !== null
+      ? compareCounts(currMedianMin, prevMedianMin, prevName, 'down', 'min slower', 'min faster')
+      : undefined;
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -678,38 +744,55 @@ function MonthlyView({
         </div>
       </div>
 
+      {k.totalSessions > 0 && (
+        <p className="text-[15px] text-[#242628] leading-relaxed max-w-[68ch]">
+          {k.totalSessions} {k.totalSessions === 1 ? 'session was' : 'sessions were'} recorded.{' '}
+          {k.completedReports} {k.completedReports === 1 ? 'report has' : 'reports have'} been
+          approved
+          {k.completionRatePct !== null ? ` (${k.completionRatePct}%)` : ''} and {k.awaitingReview}{' '}
+          {k.awaitingReview === 1 ? 'is' : 'are'} waiting for review.
+          {isCurrentMonth
+            ? ' This month is still in progress, so it is not compared with earlier months.'
+            : prev
+              ? ` Changes below are compared with ${prevName}.`
+              : ''}
+        </p>
+      )}
+
       {k.totalSessions === 0 ? (
         <EmptyState message="No visits were recorded for this month with the current filters." onReset={onReset} />
       ) : (
-        <section aria-label={`KPIs for ${k.monthLabel}`} className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <StatCard label="Clinical sessions" value={k.totalSessions} subtitle="Visits recorded this month" icon={<Activity className="w-4 h-4" aria-hidden="true" />} />
-          <StatCard label="Completed reports" value={k.completedReports} subtitle="Approved by a clinician" icon={<CheckCircle2 className="w-4 h-4" aria-hidden="true" />} accent="deep" />
-          <StatCard label="Awaiting review" value={k.awaitingReview} subtitle="Draft not yet approved" icon={<ClipboardList className="w-4 h-4" aria-hidden="true" />} accent="orange" />
+        <section aria-label={`KPIs for ${k.monthLabel}`} className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+          <StatCard label="Clinical sessions" value={k.totalSessions} subtitle="Visits recorded this month" icon={<Activity className="w-4 h-4" aria-hidden="true" />} comparison={sessionsCmp} />
+          <StatCard label="Completed reports" value={k.completedReports} subtitle="Approved by a clinician" icon={<CheckCircle2 className="w-4 h-4" aria-hidden="true" />} accent="deep" comparison={completedCmp} />
+          <StatCard label="Awaiting review" value={k.awaitingReview} subtitle="Draft not yet approved" icon={<ClipboardList className="w-4 h-4" aria-hidden="true" />} accent="orange" comparison={awaitingCmp} />
           <StatCard
             label="Completion rate"
             value={k.completionRatePct === null ? '—' : `${k.completionRatePct}%`}
-            subtitle="Completed ÷ sessions"
+            subtitle="Reports approved out of all sessions"
             icon={<ShieldCheck className="w-4 h-4" aria-hidden="true" />}
+            comparison={rateCmp}
           />
           <StatCard
             label="Median review time"
             value={k.medianReviewMinutes === null ? '—' : `${k.medianReviewMinutes} min`}
-            subtitle="Clinician time to approve"
+            subtitle="Typical clinician time to approve"
             icon={<Clock className="w-4 h-4" aria-hidden="true" />}
             accent="deep"
+            comparison={reviewCmp}
           />
         </section>
       )}
 
       <LineChart
-        title="Monthly trend"
-        description={`Clinical sessions and reports still awaiting review, per month, for the current filters. The selected month is shaded. ${formatMonthLabel(REFERENCE_DATE.slice(0, 7)).split(' ')[0]} is in progress (through ${formatYmd(REFERENCE_DATE)}).`}
+        title="Month-by-month trend"
+        description={`Sessions recorded each month, and how many reports are still waiting for review. The selected month is shaded. ${formatMonthLabel(REFERENCE_DATE.slice(0, 7)).split(' ')[0]} is in progress (through ${formatYmd(REFERENCE_DATE)}).`}
         categories={data.monthlyTrend.map((p) =>
           p.monthKey === REFERENCE_DATE.slice(0, 7) ? `${p.shortLabel} (to date)` : p.shortLabel,
         )}
         series={[
           { name: 'Clinical sessions', color: 'var(--chart-series-1)', values: data.monthlyTrend.map((p) => p.totalSessions) },
-          { name: 'Awaiting review', color: 'var(--chart-series-2)', values: data.monthlyTrend.map((p) => p.awaitingReview) },
+          { name: 'Awaiting review', color: 'var(--chart-series-2)', dashed: true, values: data.monthlyTrend.map((p) => p.awaitingReview) },
         ]}
         yAxisLabel="Count"
         xAxisLabel={`Month (${data.monthlyTrend[0]?.monthKey.slice(0, 4) ?? ''})`}
@@ -718,8 +801,8 @@ function MonthlyView({
       />
 
       <ColumnChart
-        title={`Sessions by diagnosis · ${k.monthLabel}`}
-        description="Operational count of sessions in the selected month, by diagnosis category."
+        title={`Sessions by diagnosis, ${k.monthLabel}`}
+        description="How many sessions were recorded in the selected month for each diagnosis."
         data={data.monthlyDiagnosisCounts.map((d) => ({ label: d.label, value: d.count }))}
         yAxisLabel="Sessions"
         xAxisLabel="Diagnosis category"
@@ -728,18 +811,18 @@ function MonthlyView({
 
       <Card padding="none" className="overflow-hidden">
         <div className="px-5 pt-4 pb-2">
-          <h3 className="text-base font-bold text-[#0d4026]">Month-by-month operations</h3>
-          <p className="text-xs text-[#495057]">Operational counts (not population statistics). The selected month is highlighted.</p>
+          <h3 className="text-lg font-bold text-[#0d4026] font-display">Month-by-month operations</h3>
+          <p className="text-sm text-[#495057]">Counts of sessions and reports, not population statistics. The selected month is highlighted.</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left border-collapse">
+          <table className="w-full text-[15px] text-left border-collapse">
             <caption className="sr-only">Monthly operations table</caption>
             <thead>
-              <tr className="bg-[#edf5f0] text-[11px] uppercase tracking-wider text-[#0d4026]">
+              <tr className="bg-[#edf5f0] text-xs text-[#0d4026]">
                 <th scope="col" className="py-2.5 px-4">Month</th>
                 <th scope="col" className="py-2.5 px-4 text-right">Sessions</th>
                 <th scope="col" className="py-2.5 px-4 text-right">Completed</th>
-                <th scope="col" className="py-2.5 px-4 text-right">Awaiting review</th>
+                <th scope="col" className="py-2.5 px-4 text-right">Awaiting review at month end</th>
                 <th scope="col" className="py-2.5 px-4 text-right">Released to patients</th>
                 <th scope="col" className="py-2.5 px-4 text-right">Median review</th>
               </tr>
