@@ -75,11 +75,11 @@ describe('CoSign Sequence 2 — Role Selection, Layout & Route Navigation', () =
     expect(cta).toHaveAttribute('aria-current', 'page');
   });
 
-  it('enforces RoleGuard when a Clinician attempts to open an Admin-only route', () => {
+  it('enforces RoleGuard when a Clinician attempts to open an Admin-only route', async () => {
     renderWithRouter(['/admin']);
 
     expect(
-      screen.getByRole('heading', { name: /Access restricted/i }),
+      await screen.findByRole('heading', { name: /Access restricted/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /Return to role selection/i }),

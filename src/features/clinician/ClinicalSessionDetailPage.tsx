@@ -3,19 +3,15 @@ import { Link, useBlocker, useLocation, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  CheckCircle2,
   ClipboardCheck,
-  Clock,
   FileText,
   History,
   Info,
-  Mic,
   RefreshCw,
   MessageSquareWarning,
   RotateCcw,
   Save,
   ShieldCheck,
-  Stethoscope,
 } from 'lucide-react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useServices } from '../../app/providers/ServiceProvider';
@@ -24,7 +20,6 @@ import { Button, ButtonLink } from '../../design-system/components/Button';
 import { Card } from '../../design-system/components/Card';
 import { Dialog } from '../../design-system/components/Dialog';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
-import { StepProgress } from '../../design-system/components/StepProgress';
 import { ROLE_WORKSPACE_LABELS } from '../../design-system/layouts/Sidebar';
 import type { SoapSectionKey, SoapSections } from '../../domain/models';
 import {
@@ -40,7 +35,6 @@ import { ClinicalSignOffAndReleasePanel } from './ClinicalSignOffAndReleasePanel
 import { SoapReportEditorPanel } from './SoapReportEditorPanel';
 import { TranscriptEvidencePanel } from './TranscriptEvidencePanel';
 import {
-  CAPTURE_ORIGIN_LABELS,
   DEPARTMENT_LABELS,
   DIAGNOSIS_LABELS,
   formatDurationMmSs,
@@ -48,6 +42,7 @@ import {
   formatTimeShort,
 } from './session-formatters';
 import { ClinicianWorkflowProgress } from './ClinicianWorkflowProgress';
+import { SessionLifecycleTracks, SessionPipelineStages } from './SessionLifecyclePanels';
 
 interface LocationStateWithSearch {
   readonly fromSessionsSearch?: string;
@@ -889,27 +884,7 @@ export function ClinicalSessionDetailPage() {
 
           {/* Processing Pipeline Stages */}
           <div className={mobileTab === 'transcript' ? 'hidden' : 'block'}>
-            <Card padding="md" className="space-y-4">
-              <div className="flex items-center justify-between border-b border-[#e4ece7] pb-3">
-                <div>
-                  <h2 className="text-lg font-bold text-[#0d4026] font-display">
-                    Processing Pipeline Stages
-                  </h2>
-                  <p className="text-xs text-[#495057]">
-                    5-stage audio validation, transcription, and drafting status for {session.id}.
-                  </p>
-                </div>
-                <Stethoscope className="w-5 h-5 text-[#00783c]" aria-hidden="true" />
-              </div>
-
-              {session.processing.stages.length > 0 ? (
-                <StepProgress stages={session.processing.stages} />
-              ) : (
-                <p className="text-xs text-[#495057]">
-                  Pipeline stages have not started for this session.
-                </p>
-              )}
-            </Card>
+            <SessionPipelineStages session={session} />
           </div>
         </div>
       </div>
@@ -977,105 +952,7 @@ export function ClinicalSessionDetailPage() {
         </div>
       )}
 
-      {/* 5 Orthogonal Lifecycle Tracks Summary Footer */}
-      <section
-        aria-label="Session lifecycle tracks"
-        className="hidden"
-      >
-        <Card padding="sm" className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[#00783c]">
-            <span>1. Capture</span>
-            <Mic className="w-3.5 h-3.5" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-bold text-[#0d4026] capitalize">
-            {session.capture.status.replace(/_/g, ' ')}
-          </p>
-          <p className="text-xs text-[#495057]">
-            {CAPTURE_ORIGIN_LABELS[session.capture.origin]} ·{' '}
-            {formatDurationMmSs(session.capture.durationSeconds)}
-          </p>
-          <p className="text-[11px] text-[#00783c] font-semibold">
-            {session.capture.consentConfirmed ? 'Patient consent confirmed' : 'Consent pending'}
-          </p>
-        </Card>
-
-        <Card padding="sm" className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[#00783c]">
-            <span>2. Pipeline</span>
-            <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-bold text-[#0d4026] capitalize">
-            {session.processing.status.replace(/_/g, ' ')}
-          </p>
-          <p className="text-xs text-[#495057]">
-            Retries: {session.processing.retryCount} / {session.processing.maxRetries}
-          </p>
-          <p className="text-[11px] text-[#495057]">
-            {session.processing.completedAt
-              ? `Completed at ${formatTimeShort(session.processing.completedAt)}`
-              : session.processing.failedStage
-                ? `Failed: ${session.processing.failedStage.replace(/_/g, ' ')}`
-                : 'In progress'}
-          </p>
-        </Card>
-
-        <Card padding="sm" className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[#00783c]">
-            <span>3. Review</span>
-            <ClipboardCheck className="w-3.5 h-3.5" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-bold text-[#0d4026] capitalize">
-            {session.review.status.replace(/_/g, ' ')}
-          </p>
-          <p className="text-xs text-[#495057]">
-            Revision:{' '}
-            {session.review.currentRevision > 0
-              ? `v${session.review.currentRevision}`
-              : 'Not generated'}
-          </p>
-          <p className="text-[11px] font-semibold text-[#9a4406]">
-            {session.review.unresolvedClarificationCount > 0
-              ? `${session.review.unresolvedClarificationCount} open clarifications`
-              : '0 open clarifications'}
-          </p>
-        </Card>
-
-        <Card padding="sm" className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[#00783c]">
-            <span>4. Patient Release</span>
-            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-bold text-[#0d4026] capitalize">
-            {session.release.status.replace(/_/g, ' ')}
-          </p>
-          <p className="text-xs text-[#495057]">
-            {session.release.releasedAt
-              ? `Released ${formatTimeShort(session.release.releasedAt)}`
-              : 'Not yet shared'}
-          </p>
-          <p className="text-[11px] text-[#495057]">
-            {session.release.releasedByDisplayName ?? 'Released after approval'}
-          </p>
-        </Card>
-
-        <Card padding="sm" className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[#00783c]">
-            <span>5. Analytics Track</span>
-            <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-bold text-[#0d4026] capitalize">
-            {session.privacy.status.replace(/_/g, ' ')}
-          </p>
-          <p className="text-xs text-[#495057]">
-            De-ID passes: {session.privacy.independentPassesCompleted} / 2
-          </p>
-          <p className="text-[11px] text-[#495057]">
-            {session.privacy.safeHarborChecked
-              ? 'Eligible for cohort view'
-              : 'Excluded until verified'}
-          </p>
-        </Card>
-      </section>
+      <SessionLifecycleTracks session={session} />
     </div>
   );
 }

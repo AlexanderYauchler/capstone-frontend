@@ -21,7 +21,7 @@ export function Dialog({
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 bg-[#14292e]/60 backdrop-blur-[1px] z-40" />
-        <RadixDialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-xl rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-6 shadow-xl focus:outline-none">
+        <RadixDialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 sm:p-6 shadow-xl focus:outline-none">
           <div className="flex items-start justify-between gap-4">
             <div>
               <RadixDialog.Title className="text-lg font-semibold text-[var(--color-ink)]">

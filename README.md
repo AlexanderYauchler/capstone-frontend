@@ -1,5 +1,9 @@
 # CoSign — AI for Clinical Documentation and Healthcare Analytics
 
+This repository is the canonical frontend. If opened inside the `Capstone` parent
+workspace, edit and run Git commands from `capstone-frontend/`. A sibling `src/`
+outside this repository is an older copy and must not be deployed.
+
 Parkview-inspired React 19 + TypeScript 6 clinical documentation and healthcare analytics workspace.
 
 ## 1. Node.js Runtime & Environment Setup

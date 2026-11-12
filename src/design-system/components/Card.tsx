@@ -33,6 +33,7 @@ export function Card({
 }: CardProps) {
   return (
     <div
+      data-card-padding={padding}
       className={[TONE_MAP[tone], PADDING_MAP[padding], className].filter(Boolean).join(' ')}
       {...rest}
     >

@@ -76,10 +76,14 @@
   --color-focus-on-dark: #ffffff;
 
   /* Offline-Safe Parkview Geometric Typography Stack */
-  --font-heading: 'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue',
+  --font-heading:
+    "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Helvetica Neue", sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Avenir Next", "Segoe UI", Roboto,
     sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Avenir Next', 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'SFMono-Regular', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+  --font-mono:
+    "SFMono-Regular", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
 }
 
 body {
@@ -88,6 +92,27 @@ body {
   color: var(--color-ink);
   margin: 0;
   text-rendering: optimizeLegibility;
+}
+
+/* Density changes spacing, never clinical text size or interactive target size. */
+[data-density="compact"] .workspace-content {
+  padding-block: 1rem;
+}
+[data-density="compact"] [data-card-padding="sm"] {
+  padding: 0.75rem;
+}
+[data-density="compact"] [data-card-padding="md"] {
+  padding: 1rem;
+}
+[data-density="compact"] [data-card-padding="lg"] {
+  padding: 1.25rem;
+}
+[data-density="compact"]
+  :is(.space-y-6, .space-y-5, .space-y-4)
+  > :not(:last-child) {
+  --tw-space-y-reverse: 0;
+  margin-block-start: 0;
+  margin-block-end: 0.75rem;
 }
 
 h1,
