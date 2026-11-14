@@ -5,13 +5,23 @@ export interface BreakdownTableProps {
   readonly description: string;
   readonly rows: readonly CategoryBreakdownRow[];
   readonly totalLabel: string;
+  readonly sortByValue?: boolean;
 }
 
 /**
  * Category breakdown rendered as a real table with an inline proportion bar,
  * so screen readers get the numbers directly. Suppressed cells show no bar.
  */
-export function BreakdownTable({ title, description, rows, totalLabel }: BreakdownTableProps) {
+export function BreakdownTable({
+  title,
+  description,
+  rows: inputRows,
+  totalLabel,
+  sortByValue = false,
+}: BreakdownTableProps) {
+  const rows = sortByValue
+    ? [...inputRows].sort((a, b) => (b.metric.count ?? -1) - (a.metric.count ?? -1))
+    : inputRows;
   const max = Math.max(1, ...rows.map((r) => r.metric.count ?? 0));
   return (
     <figure className="bg-white border border-[var(--color-border)] rounded-[14px] p-4 sm:p-5 space-y-3 m-0">
