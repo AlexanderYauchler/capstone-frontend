@@ -5,6 +5,7 @@ export interface LineSeries {
   readonly name: string;
   readonly color: string;
   readonly values: readonly number[];
+  readonly dashed?: boolean;
 }
 
 export interface LineChartProps {
@@ -52,7 +53,7 @@ export function LineChart({
       {series.map((s) => (
         <li key={s.name} className="inline-flex items-center gap-1.5">
           <svg width="18" height="8" aria-hidden="true">
-            <line x1="1" x2="17" y1="4" y2="4" stroke={s.color} strokeWidth={2} strokeLinecap="round" />
+            <line x1="1" x2="17" y1="4" y2="4" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeDasharray={s.dashed ? '4 3' : undefined} />
           </svg>
           {s.name}
         </li>
@@ -143,6 +144,7 @@ export function LineChart({
                 strokeWidth={2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
+                strokeDasharray={s.dashed ? '6 5' : undefined}
               />
               {s.values.map((v, i) => (
                 <circle
