@@ -57,6 +57,9 @@ import {
 } from './audio-capture-utils';
 import {
   CAPTURE_ORIGIN_LABELS,
+  DEPARTMENT_LABELS,
+  DIAGNOSIS_LABELS,
+  REPORT_TEMPLATE_LABELS,
   formatDurationMmSs,
   formatTimeShort,
 } from './session-formatters';
@@ -1489,6 +1492,79 @@ export function ClinicalRecordingStudio({ defaultMode = 'microphone', initialSes
                 </button>
               </div>
             </div>
+
+            <section
+              aria-labelledby="selected-encounter-details-heading"
+              className="rounded-[12px] border border-[#cde0d4] bg-[#f7f8f8]/75 p-3.5 sm:p-4 space-y-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3
+                    id="selected-encounter-details-heading"
+                    className="text-sm font-bold text-[#0d4026] font-display"
+                  >
+                    Selected encounter details
+                  </h3>
+                  <p className="text-xs text-[#495057]">
+                    Confirmed with recording consent. Return to Patient &amp; consent to review the
+                    linked encounter.
+                  </p>
+                </div>
+                <StatusBadge tone="neutral">Read-only while recording</StatusBadge>
+              </div>
+
+              <dl
+                data-testid="recording-encounter-details-grid"
+                className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3"
+              >
+                <div className="min-w-0 rounded-[8px] bg-white px-3 py-2 border border-[#e4ece7]">
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-[#495057]">
+                    Patient
+                  </dt>
+                  <dd className="truncate text-sm font-semibold text-[#0d4026]">
+                    {selectedPatient.displayName}
+                  </dd>
+                </div>
+                <div className="min-w-0 rounded-[8px] bg-white px-3 py-2 border border-[#e4ece7]">
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-[#495057]">
+                    Department
+                  </dt>
+                  <dd className="text-sm font-semibold text-[#0d4026]">
+                    {DEPARTMENT_LABELS[selectedDepartment]}
+                  </dd>
+                </div>
+                <div className="min-w-0 rounded-[8px] bg-white px-3 py-2 border border-[#e4ece7]">
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-[#495057]">
+                    Encounter type
+                  </dt>
+                  <dd className="text-sm font-semibold text-[#0d4026] break-words">
+                    {visitType.trim() || 'Follow-up consultation'}
+                  </dd>
+                </div>
+                <div className="min-w-0 rounded-[8px] bg-white px-3 py-2 border border-[#e4ece7]">
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-[#495057]">
+                    Clinical category
+                  </dt>
+                  <dd className="text-sm font-semibold text-[#0d4026]">
+                    {DIAGNOSIS_LABELS[diagnosisCategory]}
+                  </dd>
+                </div>
+                <div className="min-w-0 rounded-[8px] bg-white px-3 py-2 border border-[#e4ece7]">
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-[#495057]">
+                    Primary symptom
+                  </dt>
+                  <dd className="text-sm font-semibold text-[#0d4026]">{primarySymptom}</dd>
+                </div>
+                <div className="min-w-0 rounded-[8px] bg-white px-3 py-2 border border-[#e4ece7]">
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-[#495057]">
+                    Documentation template
+                  </dt>
+                  <dd className="text-sm font-semibold text-[#0d4026]">
+                    {REPORT_TEMPLATE_LABELS[templateId]}
+                  </dd>
+                </div>
+              </dl>
+            </section>
 
             {/* TAB 1: LIVE MICROPHONE RECORDING */}
             <div

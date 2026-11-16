@@ -13,6 +13,7 @@ import { DEMO_PATIENTS } from "../../services/demo/fixtures";
 import {
   DEPARTMENT_LABELS,
   DIAGNOSIS_LABELS,
+  REPORT_TEMPLATE_LABELS,
   formatEncounterDateDisplay,
 } from "./session-formatters";
 
@@ -90,13 +91,37 @@ export function CaptureEncounterForm({
             </h2>
           </div>
           {activeSession ? (
-            <StatusBadge tone="success">Linked: {activeSession.id}</StatusBadge>
+            <StatusBadge tone="success">Encounter linked</StatusBadge>
           ) : (
             <StatusBadge tone="neutral">New Encounter</StatusBadge>
           )}
         </div>
 
         <div className="space-y-3.5 text-xs sm:text-sm">
+          <section
+            aria-labelledby="encounter-details-heading"
+            aria-describedby="encounter-details-state"
+            className="space-y-3.5 rounded-[12px] border border-[#cde0d4] bg-[#f7f8f8]/70 p-3.5 sm:p-4"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3
+                  id="encounter-details-heading"
+                  className="text-sm font-bold text-[#0d4026] font-display"
+                >
+                  Encounter details
+                </h3>
+                <p id="encounter-details-state" className="text-xs text-[#495057]">
+                  {activeSession
+                    ? "Read-only values from the linked encounter."
+                    : "Review and edit these values before confirming consent and starting the recording."}
+                </p>
+              </div>
+              <StatusBadge tone={activeSession ? "neutral" : "info"}>
+                {activeSession ? "Read-only" : "Editable"}
+              </StatusBadge>
+            </div>
+
           {/* Patient Selector */}
           <div className="space-y-1">
             <label
@@ -114,15 +139,15 @@ export function CaptureEncounterForm({
             >
               {DEMO_PATIENTS.map((pat) => (
                 <option key={pat.id} value={pat.id}>
-                  {pat.displayName} ({pat.id} · {pat.dateOfBirthLabel})
+                  {pat.displayName}
                 </option>
               ))}
             </select>
           </div>
 
           {/* Department & Visit Type */}
-          <div className="hidden grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="hidden space-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
               <label
                 htmlFor="capture-department-select"
                 className="block text-xs font-bold uppercase tracking-wider text-[#0d4026]"
@@ -164,9 +189,11 @@ export function CaptureEncounterForm({
                 }
                 className="w-full h-10 px-3 rounded-[8px] border border-[#056233]/40 bg-white text-sm font-medium text-[#242628] disabled:bg-[#f7f8f8]"
               >
-                <option value="soap_standard">Standard SOAP Note</option>
+                <option value="soap_standard">
+                  {REPORT_TEMPLATE_LABELS.soap_standard}
+                </option>
                 <option value="narrative_summary">
-                  Narrative Visit Summary
+                  {REPORT_TEMPLATE_LABELS.narrative_summary}
                 </option>
               </select>
             </div>
@@ -196,7 +223,7 @@ export function CaptureEncounterForm({
             </datalist>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label
                 htmlFor="capture-diagnosis-select"
@@ -223,7 +250,7 @@ export function CaptureEncounterForm({
               </select>
             </div>
 
-            <div className="hidden space-y-1">
+            <div className="space-y-1">
               <label
                 htmlFor="capture-symptom-select"
                 className="block text-xs font-bold uppercase tracking-wider text-[#0d4026]"
@@ -254,31 +281,33 @@ export function CaptureEncounterForm({
               </select>
             </div>
           </div>
+          </section>
 
-          <div className="rounded-[10px] bg-[#f7f8f8] border border-[#d5e0db] p-3 text-xs space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[#495057]">Attending Clinician:</span>
-              <strong className="text-[#0d4026]">
-                {currentUser.displayName}
-              </strong>
+          <section
+            aria-labelledby="read-only-visit-context-heading"
+            className="rounded-[10px] bg-[#f7f8f8] border border-[#d5e0db] p-3 text-xs space-y-2"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h3 id="read-only-visit-context-heading" className="font-bold text-[#0d4026]">
+                Read-only visit context
+              </h3>
+              <span className="text-[11px] font-semibold text-[#495057]">From workspace</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#495057]">Encounter Date:</span>
-              <strong className="text-[#0d4026]">
-                {formatEncounterDateDisplay(
-                  activeSession?.encounterDate ?? "2026-10-06",
-                )}
-              </strong>
-            </div>
-            {activeSession && (
-              <div className="flex items-center justify-between">
-                <span className="text-[#495057]">Assigned Session ID:</span>
-                <strong className="font-mono text-[#00783c]">
-                  {activeSession.id}
-                </strong>
+            <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <dt className="text-[#495057]">Attending clinician</dt>
+                <dd className="font-bold text-[#0d4026]">{currentUser.displayName}</dd>
               </div>
-            )}
-          </div>
+              <div>
+                <dt className="text-[#495057]">Encounter date</dt>
+                <dd className="font-bold text-[#0d4026]">
+                  {formatEncounterDateDisplay(
+                    activeSession?.encounterDate ?? "2026-10-06",
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </section>
         </div>
       </Card>
 

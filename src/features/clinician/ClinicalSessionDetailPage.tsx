@@ -39,6 +39,7 @@ import { TranscriptEvidencePanel } from './TranscriptEvidencePanel';
 import {
   DEPARTMENT_LABELS,
   DIAGNOSIS_LABELS,
+  REPORT_TEMPLATE_LABELS,
   formatDurationMmSs,
   formatEncounterDateDisplay,
   formatTimeShort,
@@ -554,7 +555,10 @@ export function ClinicalSessionDetailPage() {
       </nav>
 
       {/* Compact Parkview Emerald Encounter Header */}
-      <section className="rounded-[18px] overflow-hidden bg-[#00783c] text-white px-5 py-5 sm:px-7 sm:py-6 shadow-2xs relative">
+      <section
+        aria-labelledby="clinical-encounter-title"
+        className="rounded-[18px] overflow-hidden bg-[#00783c] text-white px-5 py-5 sm:px-7 sm:py-6 shadow-2xs relative"
+      >
         <div
           aria-hidden="true"
           className="pointer-events-none absolute right-[-36px] bottom-[-88px] w-56 h-56 rounded-full bg-[#f26b21]"
@@ -576,14 +580,18 @@ export function ClinicalSessionDetailPage() {
               <span>Synthetic Demo Record</span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight font-display">
+            <h1
+              id="clinical-encounter-title"
+              className="text-2xl sm:text-3xl font-bold text-white leading-tight font-display"
+            >
               {session.patientName} — {session.visitType}
             </h1>
 
             <p className="text-xs sm:text-sm text-white/95 leading-relaxed">
               Assigned Clinician: <strong>{session.assignedClinicianName}</strong> · Primary
               Symptom: <strong>{session.primarySymptom}</strong> · Category:{' '}
-              <strong>{DIAGNOSIS_LABELS[session.diagnosisCategory]}</strong>
+              <strong>{DIAGNOSIS_LABELS[session.diagnosisCategory]}</strong> · Template:{' '}
+              <strong>{REPORT_TEMPLATE_LABELS[session.templateId]}</strong>
             </p>
           </div>
 
