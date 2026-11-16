@@ -20,6 +20,7 @@ import { Card } from '../../design-system/components/Card';
 import { StatCard } from '../../design-system/components/StatCard';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { ROLE_WORKSPACE_LABELS } from '../../design-system/layouts/Sidebar';
+import { handleTabListKeyDown } from '../../design-system/tab-keyboard-navigation';
 import { deriveSessionDisplayState } from '../../domain/state-machines';
 import {
   CAPTURE_ORIGIN_LABELS,
@@ -417,6 +418,9 @@ export function ClinicianDashboardPage() {
               <div
                 role="tablist"
                 aria-label="Filter today's clinical queue"
+                aria-orientation="horizontal"
+                tabIndex={-1}
+                onKeyDown={handleTabListKeyDown}
                 className="flex flex-wrap items-center gap-1.5"
               >
                 {(
@@ -447,9 +451,12 @@ export function ClinicianDashboardPage() {
                   return (
                     <button
                       key={tab.id}
+                      id={`dashboard-queue-tab-${tab.id}`}
                       role="tab"
                       type="button"
                       aria-selected={isSelected}
+                      aria-controls="dashboard-queue-panel"
+                      tabIndex={isSelected ? 0 : -1}
                       onClick={() => setActiveQueueTab(tab.id)}
                       className={[
                         'px-3 py-1.5 rounded-[8px] text-xs font-bold transition-colors cursor-pointer border',
@@ -465,6 +472,12 @@ export function ClinicianDashboardPage() {
               </div>
             </div>
 
+            <div
+              id="dashboard-queue-panel"
+              role="tabpanel"
+              aria-labelledby={`dashboard-queue-tab-${activeQueueTab}`}
+              tabIndex={0}
+            >
             {displayedQueue.length === 0 ? (
               <Card padding="lg" className="text-center space-y-3">
                 <p className="text-sm font-semibold text-[#0d4026]">
@@ -582,6 +595,7 @@ export function ClinicianDashboardPage() {
                 </div>
               </div>
             )}
+            </div>
           </section>
 
           {/* Recently Finalized & Released Sessions Section */}
