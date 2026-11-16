@@ -3,6 +3,7 @@ import type {
   ClinicalSession,
   DepartmentId,
   DiagnosisCategory,
+  ReportTemplateId,
 } from '../../domain/models';
 import { deriveSessionDisplayState } from '../../domain/state-machines';
 
@@ -19,6 +20,11 @@ export const DIAGNOSIS_LABELS: Record<DiagnosisCategory, string> = {
   URI_acute: 'Acute URI / Respiratory',
   wellness: 'Preventive Wellness',
   other: 'General Primary Care',
+};
+
+export const REPORT_TEMPLATE_LABELS: Record<ReportTemplateId, string> = {
+  soap_standard: 'Standard SOAP Note',
+  narrative_summary: 'Narrative Visit Summary',
 };
 
 export const CAPTURE_ORIGIN_LABELS: Record<CaptureOrigin, string> = {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RouterProvider, createMemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -36,6 +36,93 @@ describe('Recording workflow', () => {
     // jsdom has no microphone APIs, so the page must say so instead of failing silently.
     expect(screen.getByText(/Live Browser Microphone Capture Unavailable/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Use simulated demo audio/i })).toBeDisabled();
+  });
+
+  it('shows editable encounter metadata and preserves the confirmed values during recording', async () => {
+    const user = userEvent.setup();
+    const store = storeFor('clinician');
+    renderApp(['/clinician/sessions/new'], store);
+
+    await screen.findByRole('heading', { level: 1, name: /Record a clinical visit/i });
+    const encounterDetails = screen.getByRole('region', { name: 'Encounter details' });
+    const patientSelect = within(encounterDetails).getByLabelText(/Synthetic Patient Record/i);
+    const departmentSelect = within(encounterDetails).getByLabelText(/^Department$/i);
+    const templateSelect = within(encounterDetails).getByLabelText(/Documentation Template/i);
+    const encounterTypeInput = within(encounterDetails).getByLabelText(
+      /Visit Reason \/ Encounter Type/i,
+    );
+    const categorySelect = within(encounterDetails).getByLabelText(/Clinical Category/i);
+    const symptomSelect = within(encounterDetails).getByLabelText(/Primary Symptom/i);
+    const continueButton = screen.getByRole('button', { name: /Continue to recording/i });
+
+    expect(within(encounterDetails).getByText(/^Editable$/i)).toBeInTheDocument();
+    expect(patientSelect).toBeEnabled();
+    expect(departmentSelect).toBeEnabled();
+    expect(templateSelect).toBeEnabled();
+    expect(encounterTypeInput).toBeEnabled();
+    expect(categorySelect).toBeEnabled();
+    expect(symptomSelect).toBeEnabled();
+    expect(continueButton).toBeDisabled();
+    expect((patientSelect as HTMLSelectElement).selectedOptions[0]).toHaveTextContent(
+      /^Alex Morgan$/i,
+    );
+    expect((patientSelect as HTMLSelectElement).selectedOptions[0]).not.toHaveTextContent(
+      /pat-alex-morgan/i,
+    );
+
+    patientSelect.focus();
+    await user.tab();
+    expect(departmentSelect).toHaveFocus();
+    await user.tab();
+    expect(templateSelect).toHaveFocus();
+
+    await user.selectOptions(departmentSelect, 'cardiology');
+    await user.selectOptions(templateSelect, 'narrative_summary');
+    await user.clear(encounterTypeInput);
+    await user.type(encounterTypeInput, 'Hypertension follow-up');
+    await user.selectOptions(categorySelect, 'hypertension');
+    await user.selectOptions(symptomSelect, 'Headache');
+
+    await user.click(
+      screen.getByLabelText(/I confirm that verbal or written recording consent/i),
+    );
+    await user.click(continueButton);
+
+    const confirmedDetails = await screen.findByRole('region', {
+      name: /Selected encounter details/i,
+    });
+    expect(within(confirmedDetails).getByText('Alex Morgan')).toBeInTheDocument();
+    expect(within(confirmedDetails).getByText('Cardiology')).toBeInTheDocument();
+    expect(within(confirmedDetails).getByText('Hypertension follow-up')).toBeInTheDocument();
+    expect(within(confirmedDetails).getByText('Hypertension')).toBeInTheDocument();
+    expect(within(confirmedDetails).getByText('Headache')).toBeInTheDocument();
+    expect(
+      within(confirmedDetails).getByText('Narrative Visit Summary'),
+    ).toBeInTheDocument();
+    expect(within(confirmedDetails).getByText(/Read-only while recording/i)).toBeInTheDocument();
+    expect(within(confirmedDetails).getByTestId('recording-encounter-details-grid')).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'lg:grid-cols-3',
+    );
+
+    await waitFor(() => {
+      const createdSession = store.getState().sessions.find((session) => session.id === 'CS-1049');
+      expect(createdSession).toMatchObject({
+        department: 'cardiology',
+        visitType: 'Hypertension follow-up',
+        diagnosisCategory: 'hypertension',
+        primarySymptom: 'Headache',
+        templateId: 'narrative_summary',
+      });
+      expect(createdSession?.capture.consentConfirmed).toBe(true);
+    });
+
+    expect(departmentSelect).toBeDisabled();
+    expect(templateSelect).toBeDisabled();
+    expect(encounterTypeInput).toBeDisabled();
+    expect(categorySelect).toBeDisabled();
+    expect(symptomSelect).toBeDisabled();
   });
 
   it('supports manual keyboard activation and screen-reader relationships for capture method tabs', async () => {

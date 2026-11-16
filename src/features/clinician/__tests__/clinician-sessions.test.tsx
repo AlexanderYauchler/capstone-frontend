@@ -162,6 +162,14 @@ describe('CoSign Sequence 3A — Functional Clinician Dashboard, Sessions Direct
       screen.getByText(/Essential hypertension, mildly above target\./i),
     ).toBeInTheDocument();
 
+    const encounterHeader = screen.getByRole('region', {
+      name: /Riley Patel — Hypertension follow-up/i,
+    });
+    expect(within(encounterHeader).getByText('Cardiology')).toBeInTheDocument();
+    expect(within(encounterHeader).getByText('Headache')).toBeInTheDocument();
+    expect(within(encounterHeader).getByText('Hypertension')).toBeInTheDocument();
+    expect(within(encounterHeader).getByText('Standard SOAP Note')).toBeInTheDocument();
+
     // Return to Clinical sessions and verify the status=needs_review filter is preserved
     await user.click(screen.getByRole('link', { name: /Back to Clinical sessions/i }));
     expect(await screen.findByText(/Showing 2 of 10 sessions/i)).toBeInTheDocument();
