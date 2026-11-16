@@ -20,7 +20,9 @@ import { Button, ButtonLink } from '../../design-system/components/Button';
 import { Card } from '../../design-system/components/Card';
 import { Dialog } from '../../design-system/components/Dialog';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
+import { useMediaQuery } from '../../design-system/hooks/useMediaQuery';
 import { ROLE_WORKSPACE_LABELS } from '../../design-system/layouts/Sidebar';
+import { handleTabListKeyDown } from '../../design-system/tab-keyboard-navigation';
 import type { SoapSectionKey, SoapSections } from '../../domain/models';
 import {
   canApproveAndFinalizeReport,
@@ -65,6 +67,7 @@ export function ClinicalSessionDetailPage() {
   >({});
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileWorkbenchTab>('report');
+  const isDesktopWorkbench = useMediaQuery('(min-width: 1024px)');
   const [workflowStage, setWorkflowStage] = useState<3 | 4>(3);
   const [openApprovalOnEntry, setOpenApprovalOnEntry] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -764,7 +767,11 @@ export function ClinicalSessionDetailPage() {
       <div
         role="tablist"
         aria-label="Clinical review workbench panels"
-        className={`${visibleWorkflowStage === 3 ? 'flex' : 'hidden'} rounded-[12px] bg-[#edf5f0] p-1 border border-[#cde0d4] gap-1 max-w-3xl mx-auto w-full`}
+        aria-orientation="horizontal"
+        aria-hidden={isDesktopWorkbench || undefined}
+        tabIndex={-1}
+        onKeyDown={handleTabListKeyDown}
+        className={`${visibleWorkflowStage === 3 ? 'flex' : 'hidden'} rounded-[12px] bg-[#edf5f0] p-1 border border-[#cde0d4] gap-1 max-w-3xl mx-auto w-full lg:hidden`}
       >
         {(
           [
@@ -790,9 +797,12 @@ export function ClinicalSessionDetailPage() {
           return (
             <button
               key={tab.id}
+              id={`workbench-tab-${tab.id}`}
               type="button"
               role="tab"
               aria-selected={isSelected}
+              aria-controls={`workbench-panel-${tab.id}`}
+              tabIndex={isSelected ? 0 : -1}
               onClick={() => setMobileTab(tab.id)}
               className={`flex-1 py-2 px-2.5 rounded-[9px] text-xs font-bold transition-colors cursor-pointer ${
                 isSelected
@@ -807,12 +817,19 @@ export function ClinicalSessionDetailPage() {
       </div>
 
       {/* Main Two-Column Clinical Review Workbench Grid */}
-      <div className={`${visibleWorkflowStage === 3 ? 'grid' : 'hidden'} grid-cols-1 gap-6 items-start max-w-4xl mx-auto w-full`}>
+      <div
+        data-testid="clinical-review-split-layout"
+        className={`${visibleWorkflowStage === 3 ? 'grid' : 'hidden'} w-full min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]`}
+      >
         {/* Left Primary Column: Clarifications + Editable SOAP Report + Revision History */}
-        <div
+        <section
+          id="workbench-panel-report"
+          role={isDesktopWorkbench ? 'region' : 'tabpanel'}
+          aria-label={isDesktopWorkbench ? 'Report and clarifications panel' : undefined}
+          aria-labelledby={isDesktopWorkbench ? undefined : 'workbench-tab-report'}
           className={`min-w-0 space-y-6 ${
             mobileTab === 'report' ? 'block' : 'hidden'
-          }`}
+          } lg:block`}
         >
           {report && report.clarifications.length > 0 && (
             <ClarificationWorkbenchPanel
@@ -863,16 +880,22 @@ export function ClinicalSessionDetailPage() {
               onBundleUpdated={handleBundleUpdated}
             />
           )}
-        </div>
+        </section>
 
         {/* Right Secondary Column: Interactive Transcript & Pipeline Status */}
         <div
           className={`min-w-0 space-y-6 ${
             mobileTab === 'transcript' || mobileTab === 'lifecycle' ? 'block' : 'hidden'
-          }`}
+          } lg:block`}
         >
           {/* Transcript & Evidence Panel */}
-          <div className={mobileTab === 'lifecycle' ? 'hidden' : 'block'}>
+          <section
+            id="workbench-panel-transcript"
+            role={isDesktopWorkbench ? 'region' : 'tabpanel'}
+            aria-label={isDesktopWorkbench ? 'Transcript evidence panel' : undefined}
+            aria-labelledby={isDesktopWorkbench ? undefined : 'workbench-tab-transcript'}
+            className={`${mobileTab === 'lifecycle' ? 'hidden' : 'block'} lg:block`}
+          >
             <TranscriptEvidencePanel
               session={session}
               transcript={transcript}
@@ -880,12 +903,18 @@ export function ClinicalSessionDetailPage() {
               activeSegmentId={activeSegmentId}
               onSelectSegment={(segId) => setActiveSegmentId(segId)}
             />
-          </div>
+          </section>
 
           {/* Processing Pipeline Stages */}
-          <div className={mobileTab === 'transcript' ? 'hidden' : 'block'}>
+          <section
+            id="workbench-panel-lifecycle"
+            role={isDesktopWorkbench ? 'region' : 'tabpanel'}
+            aria-label={isDesktopWorkbench ? 'Processing pipeline status panel' : undefined}
+            aria-labelledby={isDesktopWorkbench ? undefined : 'workbench-tab-lifecycle'}
+            className={`${mobileTab === 'transcript' ? 'hidden' : 'block'} lg:block`}
+          >
             <SessionPipelineStages session={session} />
-          </div>
+          </section>
         </div>
       </div>
 

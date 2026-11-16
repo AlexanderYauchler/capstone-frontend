@@ -38,6 +38,54 @@ describe('Recording workflow', () => {
     expect(screen.getByRole('button', { name: /Use simulated demo audio/i })).toBeDisabled();
   });
 
+  it('supports manual keyboard activation and screen-reader relationships for capture method tabs', async () => {
+    const user = userEvent.setup();
+    renderApp(['/clinician/sessions/new'], storeFor('clinician'));
+
+    await screen.findByRole('heading', { level: 1, name: /Record a clinical visit/i });
+    const tablist = screen.getByRole('tablist', { name: /Audio capture method/i });
+    const microphoneTab = within(tablist).getByRole('tab', { name: /^Microphone$/i });
+    const uploadTab = within(tablist).getByRole('tab', { name: /Attach audio file/i });
+    const microphonePanel = document.getElementById('capture-method-panel-microphone');
+    const uploadPanel = document.getElementById('capture-method-panel-upload');
+
+    expect(tablist).toHaveAttribute('aria-orientation', 'horizontal');
+    expect(microphoneTab).toHaveAttribute('aria-selected', 'true');
+    expect(microphoneTab).toHaveAttribute('tabindex', '0');
+    expect(uploadTab).toHaveAttribute('tabindex', '-1');
+    expect(microphoneTab).toHaveAttribute(
+      'aria-controls',
+      'capture-method-panel-microphone',
+    );
+    expect(uploadTab).toHaveAttribute('aria-controls', 'capture-method-panel-upload');
+    expect(microphonePanel).toHaveAttribute(
+      'aria-labelledby',
+      'capture-method-tab-microphone',
+    );
+    expect(uploadPanel).toHaveAttribute('aria-labelledby', 'capture-method-tab-upload');
+    expect(microphonePanel).not.toHaveAttribute('hidden');
+    expect(uploadPanel).toHaveAttribute('hidden');
+
+    microphoneTab.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(uploadTab).toHaveFocus();
+    expect(microphoneTab).toHaveAttribute('aria-selected', 'true');
+
+    await user.keyboard('{Enter}');
+    expect(uploadTab).toHaveAttribute('aria-selected', 'true');
+    expect(uploadPanel).not.toHaveAttribute('hidden');
+    expect(microphonePanel).toHaveAttribute('hidden');
+    expect(
+      screen.getByRole('tabpanel', { name: /Attach audio file/i }),
+    ).toBeInTheDocument();
+
+    await user.keyboard('{ArrowLeft}');
+    expect(microphoneTab).toHaveFocus();
+    await user.keyboard('[Space]');
+    expect(microphoneTab).toHaveAttribute('aria-selected', 'true');
+    expect(microphonePanel).not.toHaveAttribute('hidden');
+  });
+
   it('records with simulated audio, generates a draft for the selected patient, and opens review', async () => {
     const user = userEvent.setup();
     const store = storeFor('clinician');

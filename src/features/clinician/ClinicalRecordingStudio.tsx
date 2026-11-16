@@ -33,6 +33,7 @@ import { Card } from '../../design-system/components/Card';
 import { Dialog } from '../../design-system/components/Dialog';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { ROLE_WORKSPACE_LABELS } from '../../design-system/layouts/Sidebar';
+import { handleTabListKeyDown } from '../../design-system/tab-keyboard-navigation';
 import type {
   ClinicalSession,
   DepartmentId,
@@ -1431,12 +1432,18 @@ export function ClinicalRecordingStudio({ defaultMode = 'microphone', initialSes
               <div
                 role="tablist"
                 aria-label="Audio capture method"
+                aria-orientation="horizontal"
+                tabIndex={-1}
+                onKeyDown={handleTabListKeyDown}
                 className="inline-flex rounded-[10px] bg-[#edf5f0] p-1 border border-[#cde0d4] gap-1"
               >
                 <button
+                  id="capture-method-tab-microphone"
                   type="button"
                   role="tab"
                   aria-selected={captureMode === 'microphone'}
+                  aria-controls="capture-method-panel-microphone"
+                  tabIndex={captureMode === 'microphone' ? 0 : -1}
                   disabled={
                     studioStage === 'recording' ||
                     studioStage === 'paused' ||
@@ -1456,9 +1463,12 @@ export function ClinicalRecordingStudio({ defaultMode = 'microphone', initialSes
                   <span>Microphone</span>
                 </button>
                 <button
+                  id="capture-method-tab-upload"
                   type="button"
                   role="tab"
                   aria-selected={captureMode === 'upload'}
+                  aria-controls="capture-method-panel-upload"
+                  tabIndex={captureMode === 'upload' ? 0 : -1}
                   disabled={
                     studioStage === 'recording' ||
                     studioStage === 'paused' ||
@@ -1481,8 +1491,14 @@ export function ClinicalRecordingStudio({ defaultMode = 'microphone', initialSes
             </div>
 
             {/* TAB 1: LIVE MICROPHONE RECORDING */}
-            {captureMode === 'microphone' && (
-              <div className="space-y-5">
+            <div
+              id="capture-method-panel-microphone"
+              role="tabpanel"
+              aria-labelledby="capture-method-tab-microphone"
+              tabIndex={0}
+              hidden={captureMode !== 'microphone'}
+              className="space-y-5"
+            >
                 {/* Microphone Selector & Format Capabilities Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-end">
                   <div className="sm:col-span-8 space-y-1.5">
@@ -1745,12 +1761,17 @@ export function ClinicalRecordingStudio({ defaultMode = 'microphone', initialSes
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+            </div>
 
             {/* TAB 2: UPLOAD CONSENTED AUDIO FILE */}
-            {captureMode === 'upload' && (
-              <div className="space-y-4">
+            <div
+              id="capture-method-panel-upload"
+              role="tabpanel"
+              aria-labelledby="capture-method-tab-upload"
+              tabIndex={0}
+              hidden={captureMode !== 'upload'}
+              className="space-y-4"
+            >
                 <div className="rounded-[14px] border-2 border-dashed border-[#00783c]/45 bg-[#edf5f0]/50 p-5 space-y-3">
                   <div className="flex items-start gap-3">
                     <FileAudio
@@ -1823,8 +1844,7 @@ export function ClinicalRecordingStudio({ defaultMode = 'microphone', initialSes
                     </label>
                   )}
                 </div>
-              </div>
-            )}
+            </div>
 
             {/* UPLOADING PROGRESS PANEL */}
             {studioStage === 'uploading' && (

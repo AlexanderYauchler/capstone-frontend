@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RouterProvider, createMemoryRouter } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders } from '../../../app/providers/AppProviders';
 import { appRoutes } from '../../../app/router/routes';
 import { DemoStore } from '../../../services/demo/demo-store';
@@ -24,6 +24,146 @@ function renderWorkbench(
 describe('CoSign Sequence 3B — Functional Clinical Review Workbench', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('provides an accessible desktop split view while preserving mobile panel navigation', async () => {
+    const user = userEvent.setup();
+    renderWorkbench(['/clinician/sessions/CS-1042']);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /Clinical Clarification Questions \(2\)/i,
+      }),
+    ).toBeInTheDocument();
+
+    const tablist = screen.getByRole('tablist', {
+      name: /Clinical review workbench panels/i,
+    });
+    expect(tablist).toHaveClass('lg:hidden');
+    expect(tablist).toHaveAttribute('aria-orientation', 'horizontal');
+
+    const reportTab = within(tablist).getByRole('tab', {
+      name: /Report & Clarifications/i,
+    });
+    const transcriptTab = within(tablist).getByRole('tab', {
+      name: /Transcript \(4\)/i,
+    });
+    const lifecycleTab = within(tablist).getByRole('tab', {
+      name: /Pipeline & Status/i,
+    });
+
+    expect(reportTab).toHaveAttribute('aria-controls', 'workbench-panel-report');
+    expect(transcriptTab).toHaveAttribute(
+      'aria-controls',
+      'workbench-panel-transcript',
+    );
+    expect(lifecycleTab).toHaveAttribute(
+      'aria-controls',
+      'workbench-panel-lifecycle',
+    );
+    expect(reportTab).toHaveAttribute('tabindex', '0');
+    expect(transcriptTab).toHaveAttribute('tabindex', '-1');
+    expect(lifecycleTab).toHaveAttribute('tabindex', '-1');
+
+    const layout = screen.getByTestId('clinical-review-split-layout');
+    expect(layout).toHaveClass('w-full', 'min-w-0', 'grid-cols-1');
+    expect(layout).toHaveClass(
+      'lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]',
+      'xl:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]',
+    );
+    expect(layout).not.toHaveClass('max-w-4xl');
+
+    const reportPanel = screen.getByRole('tabpanel', {
+      name: /Report & Clarifications/i,
+    });
+    const transcriptPanel = screen.getByRole('tabpanel', {
+      name: /Transcript \(4\)/i,
+    });
+    const lifecyclePanel = screen.getByRole('tabpanel', {
+      name: /Pipeline & Status/i,
+    });
+    const evidenceColumn = transcriptPanel.parentElement!;
+
+    expect(reportPanel).toHaveAttribute('aria-labelledby', 'workbench-tab-report');
+    expect(transcriptPanel).toHaveAttribute(
+      'aria-labelledby',
+      'workbench-tab-transcript',
+    );
+    expect(lifecyclePanel).toHaveAttribute(
+      'aria-labelledby',
+      'workbench-tab-lifecycle',
+    );
+    expect(reportPanel).toHaveClass('block', 'min-w-0', 'lg:block');
+    expect(evidenceColumn).toHaveClass('hidden', 'min-w-0', 'lg:block');
+    expect(transcriptPanel).toHaveClass('block', 'lg:block');
+    expect(lifecyclePanel).toHaveClass('block', 'lg:block');
+
+    reportTab.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(transcriptTab).toHaveFocus();
+    expect(reportTab).toHaveAttribute('aria-selected', 'true');
+    expect(reportTab).toHaveAttribute('tabindex', '-1');
+    expect(transcriptTab).toHaveAttribute('tabindex', '0');
+
+    await user.keyboard('{Enter}');
+    expect(reportTab).toHaveAttribute('aria-selected', 'false');
+    expect(transcriptTab).toHaveAttribute('aria-selected', 'true');
+    expect(reportPanel).toHaveClass('hidden', 'lg:block');
+    expect(evidenceColumn).toHaveClass('block', 'lg:block');
+    expect(transcriptPanel).toHaveClass('block', 'lg:block');
+    expect(lifecyclePanel).toHaveClass('hidden', 'lg:block');
+
+    await user.keyboard('{End}');
+    expect(lifecycleTab).toHaveFocus();
+    await user.keyboard('[Space]');
+    expect(lifecycleTab).toHaveAttribute('aria-selected', 'true');
+    expect(transcriptPanel).toHaveClass('hidden', 'lg:block');
+    expect(lifecyclePanel).toHaveClass('block', 'lg:block');
+
+    await user.keyboard('{Home}');
+    expect(reportTab).toHaveFocus();
+  });
+
+  it('exposes the concurrent desktop split view as labeled regions instead of inactive tabpanels', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: true,
+        media: '(min-width: 1024px)',
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }),
+    );
+
+    renderWorkbench(['/clinician/sessions/CS-1042']);
+    expect(
+      await screen.findByRole('heading', {
+        name: /Clinical Clarification Questions \(2\)/i,
+      }),
+    ).toBeInTheDocument();
+
+    const tablist = document.querySelector(
+      '[role="tablist"][aria-label="Clinical review workbench panels"]',
+    );
+    expect(tablist).toHaveAttribute('aria-hidden', 'true');
+    expect(
+      screen.getByRole('region', { name: /Report and clarifications panel/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: /Transcript evidence panel/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: /Processing pipeline status panel/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryAllByRole('tabpanel')).toHaveLength(0);
   });
 
   it('edits SOAP sections, saves draft changes as a new revision, compares with v1 AI draft, and persists across page refreshes', async () => {

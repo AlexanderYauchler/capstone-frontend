@@ -41,11 +41,43 @@ describe('CoSign Sequence 3A — Functional Clinician Dashboard, Sessions Direct
     const queueTable = await screen.findByRole('table');
     expect(within(queueTable).getAllByRole('row')).toHaveLength(9); // 1 header + 8 data rows
 
-    // Filter queue to "Needs Review (2)" tab
-    const needsReviewTab = screen.getByRole('tab', { name: /Needs Review \(2\)/i });
-    await user.click(needsReviewTab);
+    const queueTablist = screen.getByRole('tablist', {
+      name: /Filter today's clinical queue/i,
+    });
+    expect(queueTablist).toHaveAttribute('aria-orientation', 'horizontal');
 
-    const updatedTable = screen.getByRole('table');
+    const allTodayTab = within(queueTablist).getByRole('tab', {
+      name: /All Today \(8\)/i,
+    });
+    const attentionTab = within(queueTablist).getByRole('tab', {
+      name: /Needs Attention/i,
+    });
+    const needsReviewTab = screen.getByRole('tab', { name: /Needs Review \(2\)/i });
+    const releasedTab = within(queueTablist).getByRole('tab', {
+      name: /Released/i,
+    });
+
+    expect(allTodayTab).toHaveAttribute('aria-selected', 'true');
+    expect(allTodayTab).toHaveAttribute('tabindex', '0');
+    expect(needsReviewTab).toHaveAttribute('aria-controls', 'dashboard-queue-panel');
+
+    allTodayTab.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(attentionTab).toHaveFocus();
+    expect(allTodayTab).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{End}');
+    expect(releasedTab).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(allTodayTab).toHaveFocus();
+    await user.keyboard('{ArrowRight}{ArrowRight}{Enter}');
+    expect(needsReviewTab).toHaveAttribute('aria-selected', 'true');
+
+    const queuePanel = screen.getByRole('tabpanel', {
+      name: /Needs Review \(2\)/i,
+    });
+    expect(queuePanel).toHaveAttribute('aria-labelledby', needsReviewTab.id);
+
+    const updatedTable = within(queuePanel).getByRole('table');
     expect(within(updatedTable).getAllByRole('row')).toHaveLength(3); // 1 header + 2 rows (CS-1047, CS-1046)
     expect(within(updatedTable).getByText('Riley Patel')).toBeInTheDocument();
     expect(within(updatedTable).getByText('Casey Chen')).toBeInTheDocument();
