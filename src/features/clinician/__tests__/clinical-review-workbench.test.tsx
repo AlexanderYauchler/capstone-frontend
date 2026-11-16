@@ -26,6 +26,79 @@ describe('CoSign Sequence 3B — Functional Clinical Review Workbench', () => {
     window.sessionStorage.clear();
   });
 
+  it('provides an accessible desktop split view while preserving mobile panel navigation', async () => {
+    const user = userEvent.setup();
+    renderWorkbench(['/clinician/sessions/CS-1042']);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /Clinical Clarification Questions \(2\)/i,
+      }),
+    ).toBeInTheDocument();
+
+    const tablist = screen.getByRole('tablist', {
+      name: /Clinical review workbench panels/i,
+    });
+    expect(tablist).toHaveClass('lg:hidden');
+
+    const reportTab = within(tablist).getByRole('tab', {
+      name: /Report & Clarifications/i,
+    });
+    const transcriptTab = within(tablist).getByRole('tab', {
+      name: /Transcript \(4\)/i,
+    });
+    const lifecycleTab = within(tablist).getByRole('tab', {
+      name: /Pipeline & Status/i,
+    });
+
+    expect(reportTab).toHaveAttribute('aria-controls', 'workbench-panel-report');
+    expect(transcriptTab).toHaveAttribute(
+      'aria-controls',
+      'workbench-panel-transcript',
+    );
+    expect(lifecycleTab).toHaveAttribute(
+      'aria-controls',
+      'workbench-panel-lifecycle',
+    );
+
+    const layout = screen.getByTestId('clinical-review-split-layout');
+    expect(layout).toHaveClass('w-full', 'min-w-0', 'grid-cols-1');
+    expect(layout).toHaveClass(
+      'lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]',
+      'xl:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]',
+    );
+    expect(layout).not.toHaveClass('max-w-4xl');
+
+    const reportPanel = screen.getByRole('region', {
+      name: /Report and clarifications panel/i,
+    });
+    const transcriptPanel = screen.getByRole('region', {
+      name: /Transcript evidence panel/i,
+    });
+    const lifecyclePanel = screen.getByRole('region', {
+      name: /Processing pipeline status panel/i,
+    });
+    const evidenceColumn = transcriptPanel.parentElement!;
+
+    expect(reportPanel).toHaveClass('block', 'min-w-0', 'lg:block');
+    expect(evidenceColumn).toHaveClass('hidden', 'min-w-0', 'lg:block');
+    expect(transcriptPanel).toHaveClass('block', 'lg:block');
+    expect(lifecyclePanel).toHaveClass('block', 'lg:block');
+
+    await user.click(transcriptTab);
+    expect(reportTab).toHaveAttribute('aria-selected', 'false');
+    expect(transcriptTab).toHaveAttribute('aria-selected', 'true');
+    expect(reportPanel).toHaveClass('hidden', 'lg:block');
+    expect(evidenceColumn).toHaveClass('block', 'lg:block');
+    expect(transcriptPanel).toHaveClass('block', 'lg:block');
+    expect(lifecyclePanel).toHaveClass('hidden', 'lg:block');
+
+    await user.click(lifecycleTab);
+    expect(lifecycleTab).toHaveAttribute('aria-selected', 'true');
+    expect(transcriptPanel).toHaveClass('hidden', 'lg:block');
+    expect(lifecyclePanel).toHaveClass('block', 'lg:block');
+  });
+
   it('edits SOAP sections, saves draft changes as a new revision, compares with v1 AI draft, and persists across page refreshes', async () => {
     const user = userEvent.setup();
     const firstRender = renderWorkbench(['/clinician/sessions/CS-1047']);
